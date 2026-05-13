@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Focus Engine — Productivity OS
+
+A minimalist daily task manager built with Next.js, Tailwind CSS, and localStorage.
 
 ## Getting Started
 
