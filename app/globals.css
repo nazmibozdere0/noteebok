@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #fafafa;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: #000;
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth scrollbar in modals */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Textarea cursor */
+textarea {
+  caret-color: #818cf8;
+}
+
+/* Content fades out quickly; JS-driven height transition handles the row space */
+@keyframes task-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.task-exiting,
+.task-exiting-up {
+  animation: task-fade-out 180ms ease-out forwards;
+  pointer-events: none;
+}
+
+/* Entrance: slide in from above when landing in the completed section */
+@keyframes task-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.task-slide-in {
+  animation: task-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Entrance: slide in from below when returning to the pending section */
+@keyframes task-slide-in-from-below {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.task-slide-in-from-below {
+  animation: task-slide-in-from-below 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
