@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { ArrowLeft, Star, Search, X, CheckCircle2, Circle, ArrowUpRight } from 'lucide-react'
+import { Star, Search, X, CheckCircle2, Circle, ArrowUpRight, Users } from 'lucide-react'
 import { getStarredTasks, updateTaskAcrossLogs, StarredTask } from '@/lib/storage'
 import { localDateISO, cleanText } from '@/lib/hygiene'
 import { getAllTags, getTagClass } from '@/lib/tags'
@@ -9,7 +9,7 @@ import TagChips from './TagChips'
 import PersonChip from './PersonChip'
 
 interface StarredViewProps {
-  onBack: (navigateToDate?: string) => void
+  onNavigateToDate: (date: string) => void
 }
 
 type StatusFilter = 'all' | 'done' | 'undone'
@@ -29,7 +29,7 @@ function formatGroupDate(iso: string): string {
 }
 
 
-export default function StarredView({ onBack }: StarredViewProps) {
+export default function StarredView({ onNavigateToDate }: StarredViewProps) {
   const [tasks, setTasks] = useState<StarredTask[]>([])
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -38,11 +38,18 @@ export default function StarredView({ onBack }: StarredViewProps) {
   const [showTagFilter, setShowTagFilter] = useState(false)
   const tagFilterRef = useRef<HTMLDivElement>(null)
 
-  // Close tag dropdown on outside click
+  const [personFilters, setPersonFilters] = useState<string[]>([])
+  const [showPersonFilter, setShowPersonFilter] = useState(false)
+  const personFilterRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdowns on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (tagFilterRef.current && !tagFilterRef.current.contains(e.target as Node)) {
         setShowTagFilter(false)
+      }
+      if (personFilterRef.current && !personFilterRef.current.contains(e.target as Node)) {
+        setShowPersonFilter(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -78,6 +85,21 @@ export default function StarredView({ onBack }: StarredViewProps) {
     )
   }
 
+  function togglePersonFilter(person: string) {
+    setPersonFilters(prev =>
+      prev.includes(person) ? prev.filter(p => p !== person) : [...prev, person]
+    )
+  }
+
+  // Derive unique persons from all starred tasks
+  const availablePersons = useMemo(() => {
+    const set = new Set<string>()
+    for (const task of tasks) {
+      for (const m of task.mentions ?? []) set.add(m)
+    }
+    return Array.from(set).sort()
+  }, [tasks])
+
   // Filter + search
   const filtered = useMemo(() => {
     return tasks.filter(task => {
@@ -86,12 +108,15 @@ export default function StarredView({ onBack }: StarredViewProps) {
       if (statusFilter === 'undone' && task.done) return false
       if (tagFilters.length > 0) {
         const taskTags = task.tags ?? []
-        // OR logic: show task if it has at least one of the selected tags
         if (!tagFilters.some(tf => taskTags.includes(tf))) return false
+      }
+      if (personFilters.length > 0) {
+        const taskMentions = task.mentions ?? []
+        if (!personFilters.some(pf => taskMentions.includes(pf))) return false
       }
       return true
     })
-  }, [tasks, query, statusFilter, tagFilters])
+  }, [tasks, query, statusFilter, tagFilters, personFilters])
 
   // Group by the log date the task belongs to (not createdAt, which can drift from the log date)
   const grouped = useMemo(() => {
@@ -103,30 +128,16 @@ export default function StarredView({ onBack }: StarredViewProps) {
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a))
   }, [filtered])
 
-  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + tagFilters.length
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + tagFilters.length + personFilters.length
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      <div className="max-w-2xl mx-auto px-6 py-12">
+    <div className="max-w-2xl mx-auto px-6 py-10">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-10">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => onBack()}
-              className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-200
-                         transition-colors duration-150"
-            >
-              <ArrowLeft size={15} />
-              Back
-            </button>
-            <div className="w-px h-4 bg-zinc-800" />
-            <div className="flex items-center gap-2">
-              <Star size={15} className="text-amber-400" fill="currentColor" />
-              <h1 className="text-base font-medium text-white">Starred Tasks</h1>
-              <span className="text-xs text-zinc-600 tabular-nums">{tasks.length}</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 mb-10">
+          <Star size={15} className="text-amber-400" fill="currentColor" />
+          <h1 className="text-base font-medium text-white">Starred Tasks</h1>
+          <span className="text-xs text-zinc-600 tabular-nums">{tasks.length}</span>
         </div>
 
         {/* Search */}
@@ -151,65 +162,138 @@ export default function StarredView({ onBack }: StarredViewProps) {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2 mb-8 flex-wrap">
-          {/* Status */}
-          {(['all', 'undone', 'done'] as StatusFilter[]).map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-150 capitalize
-                ${statusFilter === s
-                  ? 'bg-zinc-800 text-zinc-100 border-zinc-600'
-                  : 'text-zinc-500 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300'}`}
-            >
-              {s === 'all' ? 'All' : s === 'done' ? 'Done' : 'Undone'}
-            </button>
-          ))}
+        <div className="mb-8 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
 
-          <div className="w-px h-4 bg-zinc-800" />
+            {/* Status — segmented control */}
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+              {(['all', 'undone', 'done'] as StatusFilter[]).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`text-xs px-3 py-1 rounded-md transition-all duration-150
+                    ${statusFilter === s
+                      ? 'bg-zinc-700 text-zinc-100 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  {s === 'all' ? 'All' : s === 'done' ? 'Done' : 'Undone'}
+                </button>
+              ))}
+            </div>
 
-          {/* Tag filter button */}
-          <div className="relative" ref={tagFilterRef}>
-            <button
-              onClick={() => setShowTagFilter(o => !o)}
-              className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-150
-                ${tagFilters.length > 0
-                  ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                  : 'text-zinc-500 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300'}`}
-            >
-              Tags {tagFilters.length > 0 && `· ${tagFilters.length}`}
-            </button>
+            <div className="w-px h-4 bg-zinc-800" />
 
-            {showTagFilter && (
-              <div className="absolute top-full mt-1 left-0 z-40 w-56 bg-zinc-950 border border-zinc-800
-                              rounded-xl shadow-2xl py-1 max-h-56 overflow-y-auto">
-                {availableTags.map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTagFilter(tag)}
-                    className="w-full flex items-center justify-between px-3 py-2
-                               hover:bg-zinc-900 transition-colors duration-100"
-                  >
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${getTagClass(tag)}`}>
-                      {tag}
-                    </span>
-                    {tagFilters.includes(tag) && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                    )}
-                  </button>
-                ))}
+            {/* Tag filter button */}
+            <div className="relative" ref={tagFilterRef}>
+              <button
+                onClick={() => setShowTagFilter(o => !o)}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-150
+                  ${tagFilters.length > 0
+                    ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                    : 'text-zinc-500 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300'}`}
+              >
+                Tags {tagFilters.length > 0 && `· ${tagFilters.length}`}
+              </button>
+
+              {showTagFilter && (
+                <div className="absolute top-full mt-1 left-0 z-40 w-56 bg-zinc-950 border border-zinc-800
+                                rounded-xl shadow-2xl py-1 max-h-56 overflow-y-auto">
+                  {availableTags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTagFilter(tag)}
+                      className="w-full flex items-center justify-between px-3 py-2
+                                 hover:bg-zinc-900 transition-colors duration-100"
+                    >
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${getTagClass(tag)}`}>
+                        {tag}
+                      </span>
+                      {tagFilters.includes(tag) && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* People filter button */}
+            {availablePersons.length > 0 && (
+              <div className="relative" ref={personFilterRef}>
+                <button
+                  onClick={() => setShowPersonFilter(o => !o)}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all duration-150
+                    ${personFilters.length > 0
+                      ? 'bg-zinc-700/30 text-zinc-200 border-zinc-600'
+                      : 'text-zinc-500 border-zinc-800 hover:border-zinc-700 hover:text-zinc-300'}`}
+                >
+                  <Users size={11} />
+                  People {personFilters.length > 0 && `· ${personFilters.length}`}
+                </button>
+
+                {showPersonFilter && (
+                  <div className="absolute top-full mt-1 left-0 z-40 w-48 bg-zinc-950 border border-zinc-800
+                                  rounded-xl shadow-2xl py-1 max-h-56 overflow-y-auto">
+                    {availablePersons.map(person => (
+                      <button
+                        key={person}
+                        onClick={() => togglePersonFilter(person)}
+                        className="w-full flex items-center justify-between px-3 py-2
+                                   hover:bg-zinc-900 transition-colors duration-100"
+                      >
+                        <PersonChip name={person} />
+                        {personFilters.includes(person) && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* Clear all filters */}
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => { setStatusFilter('all'); setTagFilters([]); setPersonFilters([]) }}
+                className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors ml-1"
+              >
+                Clear filters
+              </button>
             )}
           </div>
 
-          {/* Clear all filters */}
-          {activeFilterCount > 0 && (
-            <button
-              onClick={() => { setStatusFilter('all'); setTagFilters([]) }}
-              className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors ml-1"
-            >
-              Clear filters
-            </button>
+          {/* Active tag + person chips */}
+          {(tagFilters.length > 0 || personFilters.length > 0) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {tagFilters.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => toggleTagFilter(tag)}
+                  className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md border
+                              transition-opacity hover:opacity-70 ${getTagClass(tag)}`}
+                >
+                  {tag}
+                  <X size={9} />
+                </button>
+              ))}
+              {personFilters.map(person => (
+                <button
+                  key={person}
+                  onClick={() => togglePersonFilter(person)}
+                  className="flex items-center gap-1 pl-0.5 pr-2 py-0.5 rounded-full
+                             bg-zinc-800 border border-zinc-700 hover:opacity-70 transition-opacity"
+                >
+                  <span className="w-3.5 h-3.5 rounded-full bg-zinc-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[8px] font-bold text-zinc-200 leading-none">
+                      {person[0].toUpperCase()}
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-medium text-zinc-300">{person}</span>
+                  <X size={9} className="text-zinc-500" />
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -247,7 +331,7 @@ export default function StarredView({ onBack }: StarredViewProps) {
                     task={task}
                     onToggleDone={handleToggleDone}
                     onUnstar={handleUnstar}
-                    onViewOnDate={date => onBack(date)}
+                    onViewOnDate={onNavigateToDate}
                   />
                 ))}
               </div>
@@ -255,8 +339,7 @@ export default function StarredView({ onBack }: StarredViewProps) {
           ))}
         </div>
 
-      </div>
-    </main>
+    </div>
   )
 }
 

@@ -73,8 +73,8 @@ export default function TaskInput({ onAdd }: TaskInputProps) {
                      ${hasExtras ? 'rounded-t-xl rounded-b-none border-b-0' : 'rounded-xl'}`}
         />
 
-        {/* Right-side action buttons */}
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+        {/* Right-side action buttons — inset-y-0 avoids transform which would create a stacking context and clip the TagPicker dropdown */}
+        <div className="absolute right-2 inset-y-0 flex items-center gap-0.5">
           {/* Clear button — visible only when there's something to discard */}
           {isDirty && (
             <button

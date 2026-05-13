@@ -221,55 +221,56 @@ function TaskRow({
         </span>
         {mentions.map(m => <PersonChip key={m} name={m} />)}
         <TagChips tags={tags} limit={2} />
-
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setTagPickerOpen(o => !o)}
-            className={`p-0.5 rounded transition-colors duration-150
-              ${tagPickerOpen
-                ? 'text-indigo-400'
-                : 'text-zinc-800 opacity-0 group-hover:opacity-100 hover:text-zinc-500'}`}
-            title="Edit tags"
-          >
-            <Tag size={10} />
-          </button>
-          {tagPickerOpen && (
-            <TagPicker
-              selected={tags}
-              onChange={newTags => onUpdateTags(task.id, newTags)}
-              onClose={() => setTagPickerOpen(false)}
-              placement="down"
-            />
-          )}
-        </div>
       </div>
 
-      <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0">
         {isStale && (
           <span title={`${age}d old`} className="text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Flame size={12} />
+            <Flame size={13} />
           </span>
         )}
         {!visuallyDone && (
-          <span className="text-[10px] text-zinc-700 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[10px] text-zinc-600 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
             {age}d
           </span>
         )}
+        {!visuallyDone && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTagPickerOpen(o => !o)}
+              className={`p-1 rounded-md transition-all duration-150
+                ${tagPickerOpen
+                  ? 'text-indigo-400 bg-indigo-500/15'
+                  : 'text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-indigo-400 hover:bg-indigo-500/10'}`}
+              title="Edit tags"
+            >
+              <Tag size={13} />
+            </button>
+            {tagPickerOpen && (
+              <TagPicker
+                selected={tags}
+                onChange={newTags => onUpdateTags(task.id, newTags)}
+                onClose={() => setTagPickerOpen(false)}
+                placement="down"
+              />
+            )}
+          </div>
+        )}
         <button
           onClick={() => onToggleStar(task.id)}
-          className={`p-0.5 rounded transition-colors duration-150
+          className={`p-1 rounded-md transition-all duration-150
             ${task.starred
               ? 'text-amber-400 hover:text-amber-300'
-              : 'text-zinc-700 opacity-0 group-hover:opacity-100 hover:text-zinc-400'}`}
+              : 'text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-amber-400 hover:bg-amber-500/10'}`}
         >
-          <Star size={12} fill={task.starred ? 'currentColor' : 'none'} />
+          <Star size={13} fill={task.starred ? 'currentColor' : 'none'} />
         </button>
         <button
           onClick={() => onDelete(task.id)}
-          className="p-0.5 rounded text-zinc-800 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all duration-150"
+          className="p-1 rounded-md text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
         >
-          <Trash2 size={12} />
+          <Trash2 size={13} />
         </button>
       </div>
     </div>

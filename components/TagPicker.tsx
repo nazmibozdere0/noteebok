@@ -50,19 +50,20 @@ export default function TagPicker({ selected, onChange, onClose, placement = 'up
   return (
     <div
       ref={ref}
-      className={`absolute ${positionClass} left-0 z-50 w-64 bg-zinc-950 border border-zinc-800
-                 rounded-xl shadow-2xl overflow-hidden`}
+      style={{ background: '#09090b' }}
+      className={`absolute ${positionClass} left-0 z-50 w-64 border border-zinc-700
+                 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.8)] overflow-hidden`}
     >
-      <div className="p-2 border-b border-zinc-800">
-        <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-900 rounded-lg">
-          <Tag size={12} className="text-zinc-500 flex-shrink-0" />
+      <div className="px-2 pt-2 pb-2 border-b border-zinc-800">
+        <div className="flex items-center gap-2 px-2.5 py-2 bg-zinc-800 rounded-lg">
+          <Tag size={12} className="text-zinc-400 flex-shrink-0" />
           <input
             autoFocus
             value={search}
             onChange={e => setSearch(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createTag() } }}
             placeholder="Search or create tag…"
-            className="flex-1 bg-transparent text-xs text-white placeholder-zinc-600 outline-none"
+            className="flex-1 bg-transparent text-xs text-white placeholder-zinc-500 outline-none"
           />
         </div>
       </div>
@@ -73,10 +74,11 @@ export default function TagPicker({ selected, onChange, onClose, placement = 'up
           return (
             <button
               key={tag}
-              type="button"   // prevents form submission when used inside <form>
+              type="button"
               onClick={() => toggle(tag)}
-              className="w-full flex items-center justify-between px-3 py-2
-                         hover:bg-zinc-900 transition-colors duration-100"
+              className={`w-full flex items-center justify-between px-3 py-2
+                         transition-colors duration-100
+                         ${isSelected ? 'bg-zinc-800/60' : 'hover:bg-zinc-800/40'}`}
             >
               <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md border ${getTagClass(tag)}`}>
                 {tag}
@@ -95,7 +97,7 @@ export default function TagPicker({ selected, onChange, onClose, placement = 'up
             type="button"
             onClick={createTag}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-400
-                       hover:bg-zinc-900 hover:text-zinc-200 transition-colors duration-100"
+                       hover:bg-zinc-800/40 hover:text-zinc-200 transition-colors duration-100"
           >
             <Plus size={12} />
             Create <span className="text-white font-medium">"{trimmed}"</span>
