@@ -55,11 +55,13 @@ export function getActiveDates(): Set<string> {
   return active
 }
 
-// Returns logs from the past 7 days (excluding today) for retro analysis
+// Returns logs from Monday of the current week through today (inclusive)
 export function getWeekLogs(): DailyLog[] {
   const logs = getLogs()
   const result: DailyLog[] = []
-  for (let i = 1; i <= 7; i++) {
+  const dayOfWeek = new Date().getDay()
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  for (let i = daysFromMonday; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
     const key = localDateISO(d)

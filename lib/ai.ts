@@ -1,20 +1,8 @@
 import { DailyLog, RetroReport } from './types'
+import { RETRO_SYSTEM_PROMPT } from './retro-prompt'
 
 function buildPrompt(logs: DailyLog[]): string {
-  const lines: string[] = [
-    'You are a productivity coach analyzing a week of work logs.',
-    'Respond ONLY with a valid JSON object matching this exact schema:',
-    '{',
-    '  "summary": "string — 2-3 sentence narrative overview",',
-    '  "completionRate": number — 0-100 integer,',
-    '  "stuckAreas": ["string", ...] — 2-4 items,',
-    '  "collaborators": [{"name":"string","frequency":number}, ...],',
-    '  "focusRecommendations": ["string", ...] — 3 actionable bullet strings',
-    '}',
-    '',
-    'Here are the weekly logs (tasks marked [x] are done, [ ] are pending):',
-    '',
-  ]
+  const lines: string[] = ['Here are my task logs for this week:', '']
 
   for (const log of logs) {
     lines.push(`## ${log.date}`)
@@ -33,19 +21,18 @@ function buildPrompt(logs: DailyLog[]): string {
 }
 
 export async function generateRetro(logs: DailyLog[], apiKey: string): Promise<RetroReport> {
-  if (!apiKey) throw new Error('No API key configured. Add your Gemini API key in settings.')
-  if (logs.length === 0) throw new Error('No weekly data found. Start logging tasks to generate a retro.')
-
-  const prompt = buildPrompt(logs)
+  if (!apiKey) throw new Error('No API key configured. Add your Gemini API key in Settings.')
+  if (logs.length === 0) throw new Error('No data found for this week yet.')
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+        system_instruction: { parts: [{ text: RETRO_SYSTEM_PROMPT }] },
+        contents: [{ role: 'user', parts: [{ text: buildPrompt(logs) }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
       }),
     }
   )
@@ -56,14 +43,9 @@ export async function generateRetro(logs: DailyLog[], apiKey: string): Promise<R
   }
 
   const data = await response.json()
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
 
-  // Strip markdown code fences if present
-  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  if (!text) throw new Error('Empty response from AI. Please try again.')
 
-  try {
-    return JSON.parse(cleaned) as RetroReport
-  } catch {
-    throw new Error('AI returned malformed response. Please try again.')
-  }
+  return { text: text.trim() }
 }

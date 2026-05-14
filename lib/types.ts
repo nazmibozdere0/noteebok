@@ -23,9 +23,5 @@ export interface PurgeCandidate {
 export type PurgeAction = 'keep' | 'done' | 'discard'
 
 export interface RetroReport {
-  stuckAreas: string[]
-  collaborators: { name: string; frequency: number }[]
-  focusRecommendations: string[]
-  summary: string
-  completionRate: number
+  text: string
 }
