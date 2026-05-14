@@ -32,7 +32,7 @@ export default function CalendarPopover({ viewedDate, today, onSelect, onClose }
   const [activeDates, setActiveDates] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    setActiveDates(getActiveDates())
+    getActiveDates().then(setActiveDates)
   }, [])
 
   // Close on outside click

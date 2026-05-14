@@ -1,147 +1,257 @@
+import { createClient } from './supabase'
 import { DailyLog, Task } from './types'
 import { localDateISO } from './hygiene'
 
-const PREFIX = 'focus_engine_'
-const LOG_KEY = `${PREFIX}logs`
-const SETTINGS_KEY = `${PREFIX}settings`
+export type StarredTask = Task & { logDate: string }
 
-function today(): string {
-  return localDateISO()
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+async function getUserId(): Promise<string> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  return user.id
 }
 
-export function getLogs(): Record<string, DailyLog> {
-  if (typeof window === 'undefined') return {}
-  try {
-    return JSON.parse(localStorage.getItem(LOG_KEY) || '{}')
-  } catch {
-    return {}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToTask(row: any): Task {
+  return {
+    id: row.id,
+    text: row.text,
+    done: row.done,
+    doneAt: row.done_at ?? undefined,
+    createdAt: row.created_at,
+    starred: row.starred,
+    tags: row.tags ?? [],
+    mentions: row.mentions ?? [],
   }
 }
 
-export function saveLogs(logs: Record<string, DailyLog>): void {
-  localStorage.setItem(LOG_KEY, JSON.stringify(logs))
-}
+// ─── Log CRUD ────────────────────────────────────────────────────────────────
 
-export function getTodayLog(): DailyLog {
-  return getLogByDate(today())
-}
+export async function getLogByDate(date: string): Promise<DailyLog> {
+  const supabase = createClient()
+  const userId = await getUserId()
 
-export function saveTodayLog(log: DailyLog): void {
-  saveLogByDate(log)
-}
+  // Get or create the daily log row
+  let { data: log } = await supabase
+    .from('daily_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', date)
+    .maybeSingle()
 
-export function getLogByDate(date: string): DailyLog {
-  const logs = getLogs()
-  if (!logs[date]) {
-    logs[date] = { date, tasks: [], note: '' }
-    saveLogs(logs)
+  if (!log) {
+    const { data: created } = await supabase
+      .from('daily_logs')
+      .insert({ user_id: userId, date, note: '' })
+      .select()
+      .single()
+    log = created
   }
-  return logs[date]
+
+  if (!log) return { date, tasks: [], note: '' }
+
+  const { data: tasks } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('log_id', log.id)
+    .order('created_at', { ascending: false })
+
+  return {
+    date,
+    note: log.note ?? '',
+    tasks: (tasks ?? []).map(rowToTask),
+  }
 }
 
-export function saveLogByDate(log: DailyLog): void {
-  const logs = getLogs()
-  logs[log.date] = log
-  saveLogs(logs)
+export async function saveLogByDate(log: DailyLog): Promise<void> {
+  const supabase = createClient()
+  const userId = await getUserId()
+
+  // Upsert the log (get or create, update note)
+  const { data: logRow } = await supabase
+    .from('daily_logs')
+    .upsert(
+      { user_id: userId, date: log.date, note: log.note },
+      { onConflict: 'user_id,date' }
+    )
+    .select()
+    .single()
+
+  if (!logRow) return
+
+  // Delete tasks that were removed
+  const currentIds = log.tasks.map(t => t.id)
+  if (currentIds.length > 0) {
+    await supabase
+      .from('tasks')
+      .delete()
+      .eq('log_id', logRow.id)
+      .not('id', 'in', `(${currentIds.map(id => `'${id}'`).join(',')})`)
+  } else {
+    await supabase.from('tasks').delete().eq('log_id', logRow.id)
+  }
+
+  // Upsert all current tasks
+  if (log.tasks.length > 0) {
+    await supabase.from('tasks').upsert(
+      log.tasks.map(t => ({
+        id: t.id,
+        user_id: userId,
+        log_id: logRow.id,
+        text: t.text,
+        done: t.done,
+        done_at: t.doneAt ?? null,
+        created_at: t.createdAt,
+        starred: t.starred,
+        tags: t.tags ?? [],
+        mentions: t.mentions ?? [],
+      }))
+    )
+  }
 }
 
-// Returns which dates have at least one task or a non-empty note
-export function getActiveDates(): Set<string> {
-  const logs = getLogs()
+// ─── Cross-log operations ─────────────────────────────────────────────────────
+
+export async function updateTaskAcrossLogs(
+  taskId: string,
+  updater: (t: Task) => Task | null
+): Promise<void> {
+  const supabase = createClient()
+
+  const { data: row } = await supabase
+    .from('tasks').select('*').eq('id', taskId).maybeSingle()
+
+  if (!row) return
+
+  const updated = updater(rowToTask(row))
+
+  if (updated === null) {
+    await supabase.from('tasks').delete().eq('id', taskId)
+  } else {
+    await supabase.from('tasks').update({
+      text: updated.text,
+      done: updated.done,
+      done_at: updated.doneAt ?? null,
+      created_at: updated.createdAt,
+      starred: updated.starred,
+      tags: updated.tags ?? [],
+      mentions: updated.mentions ?? [],
+    }).eq('id', taskId)
+  }
+}
+
+// ─── Stale tasks ──────────────────────────────────────────────────────────────
+
+export async function getStaleTasks(days = 3): Promise<Task[]> {
+  const supabase = createClient()
+  const userId = await getUserId()
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+
+  const { data } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('done', false)
+    .lt('created_at', cutoff.toISOString())
+
+  return (data ?? []).map(rowToTask)
+}
+
+// ─── Active dates (calendar dots) ────────────────────────────────────────────
+
+export async function getActiveDates(): Promise<Set<string>> {
+  const supabase = createClient()
+  const userId = await getUserId()
+
+  const { data } = await supabase
+    .from('daily_logs')
+    .select('date, tasks(id), note')
+    .eq('user_id', userId)
+
   const active = new Set<string>()
-  for (const [date, log] of Object.entries(logs)) {
-    if (log.tasks.length > 0 || log.note.trim()) active.add(date)
+  for (const row of data ?? []) {
+    const hasTasks = Array.isArray(row.tasks) && row.tasks.length > 0
+    const hasNote = typeof row.note === 'string' && row.note.trim().length > 0
+    if (hasTasks || hasNote) active.add(row.date)
   }
   return active
 }
 
-// Returns logs from Monday of the current week through today (inclusive)
-export function getWeekLogs(): DailyLog[] {
-  const logs = getLogs()
-  const result: DailyLog[] = []
+// ─── Weekly logs (Monday → today) ────────────────────────────────────────────
+
+export async function getWeekLogs(): Promise<DailyLog[]> {
+  const supabase = createClient()
+  const userId = await getUserId()
+
   const dayOfWeek = new Date().getDay()
   const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+
+  const dates: string[] = []
   for (let i = daysFromMonday; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
-    const key = localDateISO(d)
-    if (logs[key]) result.push(logs[key])
+    dates.push(localDateISO(d))
   }
-  return result
-}
 
-// Returns ALL undone tasks older than `days` across all logs
-// Product rationale: stale tasks represent decision debt — surfacing them forces
-// the user to consciously keep, finish, or drop them rather than letting them
-// silently accumulate and erode confidence.
-export function getStaleTasks(days = 3): Task[] {
-  const logs = getLogs()
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - days)
-  const stale: Task[] = []
+  const { data: logs } = await supabase
+    .from('daily_logs')
+    .select('*, tasks(*)')
+    .eq('user_id', userId)
+    .in('date', dates)
 
-  for (const log of Object.values(logs)) {
-    for (const task of log.tasks) {
-      if (!task.done && new Date(task.createdAt) < cutoff) {
-        stale.push(task)
-      }
+  return dates.map(date => {
+    const log = logs?.find(l => l.date === date)
+    return {
+      date,
+      note: log?.note ?? '',
+      tasks: (log?.tasks ?? []).map(rowToTask),
     }
-  }
-  return stale
-}
-
-export function updateTaskAcrossLogs(taskId: string, updater: (t: Task) => Task | null): void {
-  const logs = getLogs()
-  for (const log of Object.values(logs)) {
-    const idx = log.tasks.findIndex(t => t.id === taskId)
-    if (idx !== -1) {
-      const result = updater(log.tasks[idx])
-      if (result === null) {
-        log.tasks.splice(idx, 1)
-      } else {
-        log.tasks[idx] = result
-      }
-    }
-  }
-  saveLogs(logs)
-}
-
-// Count of starred tasks across every date — used for the header badge
-export function getGlobalStarredCount(): number {
-  const logs = getLogs()
-  let count = 0
-  for (const log of Object.values(logs))
-    for (const task of log.tasks)
-      if (task.starred) count++
-  return count
-}
-
-export type StarredTask = Task & { logDate: string }
-
-// Returns all starred tasks across all logs, each tagged with the date of the log they belong to.
-// Sorted newest log-date first, then by createdAt within the same date.
-export function getStarredTasks(): StarredTask[] {
-  const logs = getLogs()
-  const starred: StarredTask[] = []
-  for (const log of Object.values(logs)) {
-    for (const task of log.tasks) {
-      if (task.starred) {
-        starred.push({ ...task, tags: task.tags ?? [], logDate: log.date })
-      }
-    }
-  }
-  return starred.sort((a, b) => {
-    const dateDiff = b.logDate.localeCompare(a.logDate)
-    if (dateDiff !== 0) return dateDiff
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
 }
 
+// ─── Starred tasks ────────────────────────────────────────────────────────────
+
+export async function getStarredTasks(): Promise<StarredTask[]> {
+  const supabase = createClient()
+  const userId = await getUserId()
+
+  const { data } = await supabase
+    .from('tasks')
+    .select('*, daily_logs(date)')
+    .eq('user_id', userId)
+    .eq('starred', true)
+    .order('created_at', { ascending: false })
+
+  return (data ?? []).map(row => ({
+    ...rowToTask(row),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    logDate: (row.daily_logs as any)?.date ?? '',
+  }))
+}
+
+export async function getGlobalStarredCount(): Promise<number> {
+  const supabase = createClient()
+  const userId = await getUserId()
+
+  const { count } = await supabase
+    .from('tasks')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('starred', true)
+
+  return count ?? 0
+}
+
+// ─── Settings (stays in localStorage — user preference, not user data) ────────
+
 export function getApiKey(): string {
   if (typeof window === 'undefined') return ''
-  return localStorage.getItem(`${SETTINGS_KEY}_apikey`) || ''
+  return localStorage.getItem('focus_engine_settings_apikey') || ''
 }
 
 export function saveApiKey(key: string): void {
-  localStorage.setItem(`${SETTINGS_KEY}_apikey`, key)
+  localStorage.setItem('focus_engine_settings_apikey', key)
 }

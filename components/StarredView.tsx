@@ -56,8 +56,9 @@ export default function StarredView({ onNavigateToDate }: StarredViewProps) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  function reload() {
-    setTasks(getStarredTasks())
+  async function reload() {
+    const starred = await getStarredTasks()
+    setTasks(starred)
   }
 
   useEffect(() => {
@@ -65,8 +66,8 @@ export default function StarredView({ onNavigateToDate }: StarredViewProps) {
     setAvailableTags(getAllTags())
   }, [])
 
-  function handleToggleDone(id: string) {
-    updateTaskAcrossLogs(id, t => ({
+  async function handleToggleDone(id: string) {
+    await updateTaskAcrossLogs(id, t => ({
       ...t,
       done: !t.done,
       doneAt: !t.done ? new Date().toISOString() : undefined,
@@ -74,8 +75,8 @@ export default function StarredView({ onNavigateToDate }: StarredViewProps) {
     reload()
   }
 
-  function handleUnstar(id: string) {
-    updateTaskAcrossLogs(id, t => ({ ...t, starred: false }))
+  async function handleUnstar(id: string) {
+    await updateTaskAcrossLogs(id, t => ({ ...t, starred: false }))
     reload()
   }
 

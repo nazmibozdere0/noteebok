@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { RotateCcw, Settings } from 'lucide-react'
 
 export type Tab = 'daily' | 'feed' | 'starred'
@@ -25,8 +26,34 @@ export default function Header({
   onSettingsClick,
   starredCount,
 }: HeaderProps) {
+  const headerRef = useRef<HTMLElement>(null)
+  const shimmerRef = useRef<HTMLDivElement>(null)
+
+  function handleMouseMove(e: React.MouseEvent<HTMLElement>) {
+    if (!headerRef.current || !shimmerRef.current) return
+    const rect = headerRef.current.getBoundingClientRect()
+    const pct = ((e.clientX - rect.left) / rect.width) * 100
+    shimmerRef.current.style.left = `${pct}%`
+  }
+
+  function handleMouseEnter() {
+    if (!shimmerRef.current) return
+    shimmerRef.current.style.opacity = '1'
+  }
+
+  function handleMouseLeave() {
+    if (!shimmerRef.current) return
+    shimmerRef.current.style.opacity = '0'
+  }
+
   return (
-    <header className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-zinc-900">
+    <header
+      ref={headerRef}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-zinc-900 overflow-hidden"
+    >
       <div className="max-w-6xl mx-auto px-8 h-16 flex items-center justify-between gap-8">
 
         {/* Brand */}
@@ -80,6 +107,23 @@ export default function Header({
         </div>
 
       </div>
+
+      {/* Cursor-tracking shimmer on bottom border */}
+      <div
+        ref={shimmerRef}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '20%',
+          height: '1px',
+          opacity: 0,
+          background: 'linear-gradient(90deg, transparent, rgba(212,212,216,0.7), transparent)',
+          transition: 'opacity 200ms ease',
+          pointerEvents: 'none',
+        }}
+      />
     </header>
   )
 }
