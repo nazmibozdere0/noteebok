@@ -21,6 +21,7 @@ body {
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  padding-right: calc(100vw - 100%);
 }
 
 /* Smooth scrollbar in modals */

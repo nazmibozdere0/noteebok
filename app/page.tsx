@@ -24,7 +24,6 @@ import {
   getGlobalStarredCount,
 } from '@/lib/storage'
 import { generateRetro } from '@/lib/ai'
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 
 function todayISO(): string { return localDateISO() }
 
@@ -64,9 +63,12 @@ function saveLastDate(date: string) {
   try { localStorage.setItem(LAST_DATE_KEY, date) } catch { /* ignore */ }
 }
 
-function formatHeaderDate(iso: string): string {
+function formatHeaderDate(iso: string): { day: string; date: string } {
   const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  return {
+    day: d.toLocaleDateString('en-US', { weekday: 'long' }),
+    date: d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+  }
 }
 
 function getSubtitle(viewedDate: string, today: string): string {
@@ -326,64 +328,73 @@ function Dashboard() {
       {activeTab === 'daily' && (
         <div className="max-w-6xl mx-auto px-8 py-10">
 
-          {/* Date navigation */}
-          <div className="mb-8">
-            <div className="relative inline-flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-2 py-2">
-              <button
-                onClick={() => navigateTo(offsetLocalDate(viewedDate, -1))}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-xl hover:bg-zinc-800 transition-all duration-150"
-              >
-                <ChevronLeft size={15} />
-              </button>
-
-              <h1 className="px-3 text-2xl font-light text-white tracking-tight whitespace-nowrap">
-                {formatHeaderDate(viewedDate)}
-              </h1>
-
-              <button
-                onClick={() => navigateTo(offsetLocalDate(viewedDate, 1))}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-xl hover:bg-zinc-800 transition-all duration-150"
-              >
-                <ChevronRight size={15} />
-              </button>
-
-              <div className="w-px h-4 bg-zinc-800 mx-1" />
-
-              <button
-                onClick={() => setCalOpen(o => !o)}
-                className={`p-1.5 rounded-xl transition-all duration-150
-                  ${calOpen ? 'text-indigo-400 bg-indigo-500/15' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
-              >
-                <CalendarDays size={15} />
-              </button>
-
-              {calOpen && (
-                <CalendarPopover
-                  viewedDate={viewedDate}
-                  today={today}
-                  onSelect={navigateTo}
-                  onClose={() => setCalOpen(false)}
-                />
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 mt-2 pl-1">
-              <p className="text-sm text-zinc-500">{getSubtitle(viewedDate, today)}</p>
-              {!isToday && (
-                <button
-                  onClick={() => navigateTo(today)}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30
-                             hover:border-indigo-400/50 rounded-full px-2.5 py-0.5 transition-all duration-150"
-                >
-                  → Today
-                </button>
-              )}
-            </div>
-          </div>
-
           {/* Two-column layout */}
           <div className="grid grid-cols-[1fr_272px] gap-10">
             <div className="min-w-0">
+
+              {/* Date navigation — lives inside left column so right edge aligns with task input */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-3xl tracking-tight whitespace-nowrap select-none">
+                    <span className="font-semibold text-white">{formatHeaderDate(viewedDate).day}</span>
+                    <span className="font-light text-zinc-500 ml-2.5">{formatHeaderDate(viewedDate).date}</span>
+                  </h1>
+
+                  <div className="relative flex items-center gap-1">
+                    <button
+                      onClick={() => navigateTo(offsetLocalDate(viewedDate, -1))}
+                      className="p-1.5 text-zinc-300 hover:text-white transition-colors duration-150"
+                    >
+                      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="10 3 5 8 10 13" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => navigateTo(offsetLocalDate(viewedDate, 1))}
+                      className="p-1.5 text-zinc-300 hover:text-white transition-colors duration-150"
+                    >
+                      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 3 11 8 6 13" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setCalOpen(o => !o)}
+                      className={`p-1.5 transition-colors duration-150
+                        ${calOpen ? 'text-indigo-400' : 'text-zinc-300 hover:text-white'}`}
+                    >
+                      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="12" height="11" rx="1.5" />
+                        <line x1="2" y1="7" x2="14" y2="7" />
+                        <line x1="5.5" y1="1.5" x2="5.5" y2="5" />
+                        <line x1="10.5" y1="1.5" x2="10.5" y2="5" />
+                      </svg>
+                    </button>
+
+                    <div className="w-px h-4 bg-zinc-800 mx-1" />
+
+                    <button
+                      onClick={() => { if (!isToday) navigateTo(today) }}
+                      className="text-xs px-3.5 py-1.5 rounded-full border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 transition-all duration-150"
+                    >
+                      Today
+                    </button>
+
+                    {calOpen && (
+                      <CalendarPopover
+                        viewedDate={viewedDate}
+                        today={today}
+                        onSelect={navigateTo}
+                        onClose={() => setCalOpen(false)}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2 pl-1">
+                  <p className="text-sm text-zinc-500">{getSubtitle(viewedDate, today)}</p>
+                </div>
+              </div>
+
               <TaskInput onAdd={handleAddTask} />
               {logLoading ? (
                 <div className="mt-6 space-y-3">

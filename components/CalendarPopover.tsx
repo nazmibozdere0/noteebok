@@ -73,7 +73,7 @@ export default function CalendarPopover({ viewedDate, today, onSelect, onClose }
   return (
     <div
       ref={ref}
-      className="absolute top-full left-0 mt-2 z-50 w-72 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl"
+      className="absolute top-full right-0 mt-2 z-50 w-72 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl"
     >
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
