@@ -8,10 +8,11 @@ interface TagPickerProps {
   selected: string[]
   onChange: (tags: string[]) => void
   onClose: () => void
-  placement?: 'up' | 'down'  // 'up' for TaskInput, 'down' for TaskRow
+  placement?: 'up' | 'down'
+  containerRef?: React.RefObject<HTMLDivElement | null>
 }
 
-export default function TagPicker({ selected, onChange, onClose, placement = 'up' }: TagPickerProps) {
+export default function TagPicker({ selected, onChange, onClose, placement = 'up', containerRef }: TagPickerProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [search, setSearch] = useState('')
   const [allTags, setAllTags] = useState<string[]>([])
@@ -19,12 +20,22 @@ export default function TagPicker({ selected, onChange, onClose, placement = 'up
   useEffect(() => { setAllTags(getAllTags()) }, [])
 
   useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    function handleMouse(e: MouseEvent) {
+      const target = e.target as Node
+      if (ref.current?.contains(target)) return
+      if (containerRef?.current?.contains(target)) return
+      onClose()
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', handleMouse)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleMouse)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [onClose, containerRef])
 
   const filtered = allTags.filter(t => t.toLowerCase().includes(search.toLowerCase()))
   const trimmed = search.trim()

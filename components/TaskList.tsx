@@ -194,6 +194,7 @@ function TaskRow({
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const tagContainerRef = useRef<HTMLDivElement>(null)
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fillTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fillRef = useRef<HTMLDivElement>(null)
@@ -269,7 +270,7 @@ function TaskRow({
       onTouchStart={startPress}
       onTouchEnd={cancelPress}
       className={[
-        'group relative flex items-center gap-2 px-2 py-1.5 rounded-lg overflow-hidden',
+        'group relative flex items-center gap-2 px-2 py-1.5 rounded-lg',
         newlyCompleted ? 'task-slide-in' : '',
         newlyUncompleted ? 'task-slide-in-from-below' : '',
         completing ? 'task-exiting' : '',
@@ -279,15 +280,17 @@ function TaskRow({
           : '',
       ].filter(Boolean).join(' ')}
     >
-      <div
-        ref={fillRef}
-        className="absolute inset-y-0 left-0 rounded-lg pointer-events-none"
-        style={{
-          width: '0%',
-          opacity: 0,
-          background: 'linear-gradient(90deg, rgba(34,197,94,0.35), rgba(34,197,94,0.12))',
-        }}
-      />
+      <div className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none">
+        <div
+          ref={fillRef}
+          className="absolute inset-y-0 left-0"
+          style={{
+            width: '0%',
+            opacity: 0,
+            background: 'linear-gradient(90deg, rgba(34,197,94,0.35), rgba(34,197,94,0.12))',
+          }}
+        />
+      </div>
       <button
         onClick={onToggle}
         onDoubleClick={e => e.stopPropagation()}
@@ -333,7 +336,7 @@ function TaskRow({
           </span>
         )}
         {!editing && (
-          <div className="relative">
+          <div className="relative" ref={tagContainerRef}>
             <button
               type="button"
               onClick={() => setTagPickerOpen(o => !o)}
@@ -350,6 +353,7 @@ function TaskRow({
                 selected={tags}
                 onChange={newTags => onUpdateTags(task.id, newTags)}
                 onClose={() => setTagPickerOpen(false)}
+                containerRef={tagContainerRef}
                 placement="down"
               />
             )}
