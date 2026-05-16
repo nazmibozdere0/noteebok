@@ -16,7 +16,6 @@ interface HeaderProps {
   onTabChange: (tab: Tab) => void
   onRetroClick: () => void
   onSettingsClick: () => void
-  starredCount: number
   user: AppUser | null
   onLogout: () => void
 }
@@ -32,7 +31,6 @@ export default function Header({
   onTabChange,
   onRetroClick,
   onSettingsClick,
-  starredCount,
   user,
   onLogout,
 }: HeaderProps) {
@@ -86,12 +84,6 @@ export default function Header({
                   : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               {tab.label}
-              {tab.id === 'starred' && starredCount > 0 && (
-                <span className={`ml-1.5 text-xs tabular-nums
-                  ${activeTab === 'starred' ? 'text-amber-400' : 'text-zinc-600'}`}>
-                  {starredCount}
-                </span>
-              )}
             </button>
           ))}
         </nav>

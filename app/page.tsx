@@ -30,6 +30,7 @@ function todayISO(): string { return localDateISO() }
 
 const LOG_CACHE_KEY = 'nb_log_cache'
 const LAST_DATE_KEY = 'nb_last_date'
+const USER_KEY = 'nb_user'
 const CACHE_WINDOW = 15 // days before/after today to keep
 
 function readLogCache(): Map<string, DailyLog> {
@@ -130,7 +131,9 @@ function Dashboard() {
   const [retroError, setRetroError] = useState<string | null>(null)
   const [retroLoading, setRetroLoading] = useState(false)
   const [calOpen, setCalOpen] = useState(false)
-  const [appUser, setAppUser] = useState<{ name: string; email: string; avatar: string } | null>(null)
+  const [appUser, setAppUser] = useState<{ name: string; email: string; avatar: string } | null>(() => {
+    try { return JSON.parse(localStorage.getItem(USER_KEY) ?? 'null') } catch { return null }
+  })
   const pendingSaves = useRef<Set<Promise<void>>>(new Set())
 
   function navigateTo(date: string) {
@@ -142,11 +145,13 @@ function Dashboard() {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return
-      setAppUser({
+      const user = {
         name: data.user.user_metadata?.full_name ?? data.user.email ?? '',
         email: data.user.email ?? '',
         avatar: data.user.user_metadata?.avatar_url ?? '',
-      })
+      }
+      setAppUser(user)
+      try { localStorage.setItem(USER_KEY, JSON.stringify(user)) } catch { /* ignore */ }
     })
   }, [])
 
@@ -155,6 +160,7 @@ function Dashboard() {
     const supabase = createClient()
     localStorage.removeItem(LOG_CACHE_KEY)
     localStorage.removeItem(LAST_DATE_KEY)
+    localStorage.removeItem(USER_KEY)
     await supabase.auth.signOut()
   }
 
@@ -302,7 +308,6 @@ function Dashboard() {
         onTabChange={setActiveTab}
         onRetroClick={() => setShowRetro(true)}
         onSettingsClick={() => setShowSettings(true)}
-        starredCount={globalStarredCount}
         user={appUser}
         onLogout={handleLogout}
       />

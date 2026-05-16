@@ -29,8 +29,22 @@ function formatGroupDate(iso: string): string {
 }
 
 
+const STARRED_CACHE_KEY = 'nb_starred_cache'
+
+function readStarredCache(): StarredTask[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(STARRED_CACHE_KEY)
+    return raw ? (JSON.parse(raw) as StarredTask[]) : []
+  } catch { return [] }
+}
+
+function writeStarredCache(tasks: StarredTask[]) {
+  try { localStorage.setItem(STARRED_CACHE_KEY, JSON.stringify(tasks)) } catch { /* ignore */ }
+}
+
 export default function StarredView({ onNavigateToDate }: StarredViewProps) {
-  const [tasks, setTasks] = useState<StarredTask[]>([])
+  const [tasks, setTasks] = useState<StarredTask[]>(() => readStarredCache())
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [tagFilters, setTagFilters] = useState<string[]>([])
@@ -58,13 +72,14 @@ export default function StarredView({ onNavigateToDate }: StarredViewProps) {
 
   async function reload() {
     const starred = await getStarredTasks()
+    writeStarredCache(starred)
     setTasks(starred)
   }
 
   useEffect(() => {
     reload()
     setAvailableTags(getAllTags())
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleToggleDone(id: string) {
     await updateTaskAcrossLogs(id, t => ({
