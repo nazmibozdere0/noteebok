@@ -1,9 +1,15 @@
 'use client'
 
-import { useRef } from 'react'
-import { RotateCcw, Settings } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { RotateCcw, Settings, LogOut, User } from 'lucide-react'
 
 export type Tab = 'daily' | 'feed' | 'starred'
+
+interface AppUser {
+  name: string
+  email: string
+  avatar: string
+}
 
 interface HeaderProps {
   activeTab: Tab
@@ -11,6 +17,8 @@ interface HeaderProps {
   onRetroClick: () => void
   onSettingsClick: () => void
   starredCount: number
+  user: AppUser | null
+  onLogout: () => void
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -25,6 +33,8 @@ export default function Header({
   onRetroClick,
   onSettingsClick,
   starredCount,
+  user,
+  onLogout,
 }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null)
   const shimmerRef = useRef<HTMLDivElement>(null)
@@ -52,7 +62,7 @@ export default function Header({
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-zinc-900 overflow-hidden"
+      className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-zinc-900"
     >
       <div className="max-w-6xl mx-auto px-8 h-16 flex items-center justify-between gap-8">
 
@@ -97,13 +107,7 @@ export default function Header({
             <RotateCcw size={13} />
             Weekly Retro
           </button>
-          <button
-            onClick={onSettingsClick}
-            className="p-2 text-zinc-500 hover:text-zinc-300 border border-zinc-800
-                       hover:border-zinc-600 rounded-xl transition-all duration-150"
-          >
-            <Settings size={14} />
-          </button>
+          <AvatarMenu user={user} onSettings={onSettingsClick} onLogout={onLogout} />
         </div>
 
       </div>
@@ -125,5 +129,89 @@ export default function Header({
         }}
       />
     </header>
+  )
+}
+
+function AvatarMenu({
+  user,
+  onSettings,
+  onLogout,
+}: {
+  user: AppUser | null
+  onSettings: () => void
+  onLogout: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const initials = user?.name
+    ? user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '?'
+
+  async function handleLogout() {
+    setLoggingOut(true)
+    await onLogout()
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-8 h-8 rounded-full overflow-hidden border border-zinc-700 hover:border-zinc-500 transition-colors flex-shrink-0"
+      >
+        {user?.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+            <User size={14} className="text-zinc-400" />
+          </div>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-52 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl py-1 z-[100]">
+
+          {/* User info */}
+          <div className="px-3 py-2.5 border-b border-zinc-800">
+            <p className="text-sm text-zinc-200 font-medium truncate">{user?.name ?? '—'}</p>
+            <p className="text-xs text-zinc-500 truncate mt-0.5">{user?.email ?? ''}</p>
+          </div>
+
+          {/* Settings */}
+          <button
+            onClick={() => { onSettings(); setOpen(false) }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-400
+                       hover:text-white hover:bg-zinc-900 transition-colors duration-100"
+          >
+            <Settings size={13} />
+            Settings
+          </button>
+
+          {/* Log out */}
+          <div className="border-t border-zinc-800 mt-1 pt-1">
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400
+                         hover:text-red-300 hover:bg-zinc-900 transition-colors duration-100
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <LogOut size={13} />
+              {loggingOut ? 'Saving…' : 'Log out'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

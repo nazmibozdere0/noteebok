@@ -113,10 +113,32 @@ function Dashboard() {
   const [retroError, setRetroError] = useState<string | null>(null)
   const [retroLoading, setRetroLoading] = useState(false)
   const [calOpen, setCalOpen] = useState(false)
+  const [appUser, setAppUser] = useState<{ name: string; email: string; avatar: string } | null>(null)
+  const pendingSaves = useRef<Set<Promise<void>>>(new Set())
 
   function navigateTo(date: string) {
     saveLastDate(date)
     setViewedDate(date)
+  }
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return
+      setAppUser({
+        name: data.user.user_metadata?.full_name ?? data.user.email ?? '',
+        email: data.user.email ?? '',
+        avatar: data.user.user_metadata?.avatar_url ?? '',
+      })
+    })
+  }, [])
+
+  async function handleLogout() {
+    await Promise.allSettled(Array.from(pendingSaves.current))
+    const supabase = createClient()
+    localStorage.removeItem(LOG_CACHE_KEY)
+    localStorage.removeItem(LAST_DATE_KEY)
+    await supabase.auth.signOut()
   }
 
   // On mount: prefetch today ±2 days in background
@@ -169,7 +191,9 @@ function Dashboard() {
     setLog(prev => {
       const next = updater(prev)
       persistLogCache(cache.current, next.date, next)
-      saveLogByDate(next).catch(console.error)
+      const p = saveLogByDate(next).catch(console.error) as Promise<void>
+      pendingSaves.current.add(p)
+      p.finally(() => pendingSaves.current.delete(p))
       return next
     })
   }
@@ -262,6 +286,8 @@ function Dashboard() {
         onRetroClick={() => setShowRetro(true)}
         onSettingsClick={() => setShowSettings(true)}
         starredCount={globalStarredCount}
+        user={appUser}
+        onLogout={handleLogout}
       />
 
       {/* Daily Management */}
