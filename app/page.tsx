@@ -140,9 +140,20 @@ function Dashboard() {
 
   function navigateTo(date: string) {
     saveLastDate(date)
+    // Apply cached state immediately — batched with setViewedDate into one render,
+    // eliminating the flash of stale content between navigation clicks.
+    const cached = cache.current.get(date)
+    if (cached) {
+      setLog(cached)
+      setLogLoading(false)
+    } else {
+      setLog({ date, tasks: [], note: '' })
+      setLogLoading(true)
+    }
     setViewedDate(date)
   }
 
+  // On mount: resolve auth once, then prefetch today ±2 and stale tasks
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
@@ -154,6 +165,18 @@ function Dashboard() {
       }
       setAppUser(user)
       try { localStorage.setItem(USER_KEY, JSON.stringify(user)) } catch { /* ignore */ }
+
+      // Auth is confirmed — safe to prefetch adjacent dates now
+      for (const offset of [-2, -1, 0, 1, 2]) {
+        const d = offsetLocalDate(today, offset)
+        if (!cache.current.has(d)) {
+          getLogByDate(d).then(l => persistLogCache(cache.current, d, l))
+        }
+      }
+      getStaleTasks(3).then(stale => {
+        setStaleTasks(stale)
+        if (stale.length > 0) setTimeout(() => setShowPurge(true), 800)
+      })
     })
   }, [])
 
@@ -165,20 +188,6 @@ function Dashboard() {
     localStorage.removeItem(USER_KEY)
     await supabase.auth.signOut()
   }
-
-  // On mount: prefetch today ±2 days in background
-  useEffect(() => {
-    for (const offset of [-2, -1, 0, 1, 2]) {
-      const d = offsetLocalDate(today, offset)
-      if (!cache.current.has(d)) {
-        getLogByDate(d).then(l => persistLogCache(cache.current, d, l))
-      }
-    }
-    getStaleTasks(3).then(stale => {
-      setStaleTasks(stale)
-      if (stale.length > 0) setTimeout(() => setShowPurge(true), 800)
-    })
-  }, [today])
 
   useEffect(() => {
     const cached = cache.current.get(viewedDate)
