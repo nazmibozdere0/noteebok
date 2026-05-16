@@ -36,9 +36,15 @@ export function offsetLocalDate(iso: string, days: number): string {
   return localDateISO(d)
 }
 
-// Strip @mentions from task text for clean display — mentions are shown as separate person tags
+// Extract #tagname shortcuts from task text
+export function extractTagShortcuts(text: string): string[] {
+  const matches = text.match(/#(\w+)/g) || []
+  return [...new Set(matches.map(m => m.slice(1)))]
+}
+
+// Strip @mentions and #tags from task text for clean display
 export function cleanText(text: string): string {
-  return text.replace(/@\w+/g, '').replace(/\s+/g, ' ').trim()
+  return text.replace(/@\w+/g, '').replace(/#\w+/g, '').replace(/\s+/g, ' ').trim()
 }
 
 export function formatDate(iso: string): string {

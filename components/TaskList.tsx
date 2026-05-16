@@ -303,14 +303,24 @@ function TaskRow({
 
       <div className="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
         {editing ? (
-          <input
-            ref={inputRef}
-            value={editValue}
-            onChange={e => setEditValue(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent text-sm text-zinc-200 outline-none border-b border-zinc-600 focus:border-indigo-500 transition-colors duration-150 py-0.5 min-w-0"
-          />
+          <div className="relative flex-1 min-w-0">
+            <div aria-hidden className="absolute inset-0 flex items-center text-sm pointer-events-none whitespace-pre overflow-hidden py-0.5">
+              {editValue.split(/(@\w+|#\w+)/g).map((part, i) => {
+                if (part.startsWith('@')) return <span key={i} className="text-indigo-400">{part}</span>
+                if (part.startsWith('#')) return <span key={i} className="text-emerald-400">{part}</span>
+                return <span key={i} className="text-transparent">{part}</span>
+              })}
+              {editValue.endsWith('#') && <span className="text-zinc-500">Work</span>}
+            </div>
+            <input
+              ref={inputRef}
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={handleKeyDown}
+              className="w-full bg-transparent text-sm text-zinc-200 outline-none border-b border-zinc-600 focus:border-indigo-500 transition-colors duration-150 py-0.5"
+            />
+          </div>
         ) : (
           <>
             <span className={`text-sm leading-snug transition-all duration-200 select-none

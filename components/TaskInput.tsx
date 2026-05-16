@@ -30,13 +30,15 @@ export default function TaskInput({ onAdd }: TaskInputProps) {
   }
 
   function renderHighlighted() {
-    return value.split(/(@\w+)/g).map((part, i) =>
-      part.startsWith('@') ? (
-        <span key={i} className="text-indigo-400">{part}</span>
-      ) : (
-        <span key={i} className="text-transparent">{part}</span>
-      )
-    )
+    const parts = value.split(/(@\w+|#\w+)/g)
+    const nodes = parts.map((part, i) => {
+      if (part.startsWith('@')) return <span key={i} className="text-indigo-400">{part}</span>
+      if (part.startsWith('#')) return <span key={i} className="text-emerald-400">{part}</span>
+      return <span key={i} className="text-transparent">{part}</span>
+    })
+    // Ghost hint: show example when user types # alone
+    if (value.endsWith('#')) nodes.push(<span key="ghost" className="text-zinc-500">Work</span>)
+    return nodes
   }
 
   const hasExtras = tags.length > 0
@@ -66,7 +68,7 @@ export default function TaskInput({ onAdd }: TaskInputProps) {
           ref={inputRef}
           value={value}
           onChange={e => setValue(e.target.value)}
-          placeholder="Add a task… use @name to mention someone"
+          placeholder="Add a task and attach people (@name) or tag (#design)"
           className={`w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 text-sm text-white
                      placeholder-zinc-600 outline-none transition-colors duration-150 font-mono
                      caret-indigo-400 px-4 py-3.5 pr-28

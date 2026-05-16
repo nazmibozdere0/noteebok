@@ -13,7 +13,7 @@ import SettingsModal from '@/components/SettingsModal'
 import StarredView from '@/components/StarredView'
 import CalendarPopover from '@/components/CalendarPopover'
 import { Task, DailyLog, RetroReport } from '@/lib/types'
-import { generateId, extractMentions, localDateISO, offsetLocalDate } from '@/lib/hygiene'
+import { generateId, extractMentions, extractTagShortcuts, localDateISO, offsetLocalDate } from '@/lib/hygiene'
 import {
   getLogByDate,
   saveLogByDate,
@@ -235,13 +235,14 @@ function Dashboard() {
   }
 
   function handleAddTask(text: string, tags: string[], starred: boolean) {
+    const shortcutTags = extractTagShortcuts(text)
     const task: Task = {
       id: generateId(),
       text,
       done: false,
       createdAt: new Date().toISOString(),
       mentions: extractMentions(text),
-      tags,
+      tags: [...new Set([...tags, ...shortcutTags])],
       starred,
     }
     updateLog(prev => ({ ...prev, tasks: [task, ...prev.tasks] }))
@@ -275,10 +276,16 @@ function Dashboard() {
 
   function handleUpdateText(id: string, text: string) {
     if (!text.trim()) return
+    const shortcutTags = extractTagShortcuts(text)
     updateLog(prev => ({
       ...prev,
       tasks: prev.tasks.map(t =>
-        t.id === id ? { ...t, text: text.trim(), mentions: extractMentions(text) } : t
+        t.id === id ? {
+          ...t,
+          text: text.trim(),
+          mentions: extractMentions(text),
+          tags: [...new Set([...(t.tags ?? []), ...shortcutTags])],
+        } : t
       ),
     }))
   }
