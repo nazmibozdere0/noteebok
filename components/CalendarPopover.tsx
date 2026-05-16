@@ -9,6 +9,7 @@ interface CalendarPopoverProps {
   today: string            // YYYY-MM-DD actual today
   onSelect: (date: string) => void
   onClose: () => void
+  placement?: 'down' | 'up'
 }
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
@@ -21,7 +22,7 @@ function toYMD(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-export default function CalendarPopover({ viewedDate, today, onSelect, onClose }: CalendarPopoverProps) {
+export default function CalendarPopover({ viewedDate, today, onSelect, onClose, placement = 'down' }: CalendarPopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   const [cursor, setCursor] = useState<{ year: number; month: number }>(() => {
@@ -73,7 +74,7 @@ export default function CalendarPopover({ viewedDate, today, onSelect, onClose }
   return (
     <div
       ref={ref}
-      className="absolute top-full right-0 mt-2 z-50 w-72 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl"
+      className={`absolute ${placement === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-50 w-72 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl`}
     >
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">

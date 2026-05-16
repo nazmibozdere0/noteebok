@@ -12,6 +12,8 @@ import RetroModal from '@/components/RetroModal'
 import SettingsModal from '@/components/SettingsModal'
 import StarredView from '@/components/StarredView'
 import CalendarPopover from '@/components/CalendarPopover'
+import BulkActionFooter from '@/components/BulkActionFooter'
+import ActionToast from '@/components/ActionToast'
 import { Task, DailyLog, RetroReport } from '@/lib/types'
 import { generateId, extractMentions, extractTagShortcuts, localDateISO, offsetLocalDate } from '@/lib/hygiene'
 import {
@@ -22,6 +24,7 @@ import {
   getWeekLogs,
   getApiKey,
   getGlobalStarredCount,
+  moveTasksToDate,
 } from '@/lib/storage'
 import { generateRetro } from '@/lib/ai'
 
@@ -133,6 +136,16 @@ function Dashboard() {
   const [retroError, setRetroError] = useState<string | null>(null)
   const [retroLoading, setRetroLoading] = useState(false)
   const [calOpen, setCalOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [pendingUndo, setPendingUndo] = useState<{
+    type: 'complete' | 'delete' | 'move'
+    tasks: Task[]
+    fromDate?: string
+    toDate?: string
+    message: string
+    key: number
+    timerReady: boolean
+  } | null>(null)
   const [appUser, setAppUser] = useState<{ name: string; email: string; avatar: string } | null>(() => {
     try { return JSON.parse(localStorage.getItem(USER_KEY) ?? 'null') } catch { return null }
   })
@@ -151,6 +164,7 @@ function Dashboard() {
       setLogLoading(true)
     }
     setViewedDate(date)
+    setSelectedIds(new Set())
   }
 
   // Fetch and cache user profile
@@ -208,6 +222,12 @@ function Dashboard() {
         persistLogCache(cache.current, viewedDate, l)
         setLog(l)
         setLogLoading(false)
+        // Signal the undo toast timer to start now that the target log has loaded
+        setPendingUndo(prev =>
+          prev?.type === 'move' && prev.toDate === viewedDate
+            ? { ...prev, timerReady: true }
+            : prev
+        )
       })
     }
     // Prefetch adjacent dates
@@ -264,6 +284,7 @@ function Dashboard() {
   }
 
   function handleToggleTask(id: string) {
+    setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n })
     updateLog(prev => {
       const task = prev.tasks.find(t => t.id === id)
       if (!task) return prev
@@ -306,7 +327,89 @@ function Dashboard() {
   }
 
   function handleDeleteTask(id: string) {
+    setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n })
     updateLog(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }))
+  }
+
+  function handleBulkComplete() {
+    const ids = selectedIds
+    const affected = log.tasks.filter(t => ids.has(t.id) && !t.done)
+    if (affected.length === 0) { setSelectedIds(new Set()); return }
+    setPendingUndo({
+      type: 'complete',
+      tasks: affected,
+      message: `${affected.length} task${affected.length !== 1 ? 's' : ''} completed`,
+      key: Date.now(),
+      timerReady: true,
+    })
+    updateLog(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t =>
+        ids.has(t.id) && !t.done
+          ? { ...t, done: true, doneAt: new Date().toISOString() }
+          : t
+      ),
+    }))
+    setSelectedIds(new Set())
+  }
+
+  function handleBulkDelete() {
+    const ids = selectedIds
+    const affected = log.tasks.filter(t => ids.has(t.id))
+    setPendingUndo({
+      type: 'delete',
+      tasks: affected,
+      message: `${affected.length} task${affected.length !== 1 ? 's' : ''} deleted`,
+      key: Date.now(),
+      timerReady: true,
+    })
+    updateLog(prev => ({ ...prev, tasks: prev.tasks.filter(t => !ids.has(t.id)) }))
+    setSelectedIds(new Set())
+  }
+
+  async function handleBulkMoveToDate(targetDate: string) {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    const affected = log.tasks.filter(t => selectedIds.has(t.id))
+    const fromDate = viewedDate
+    const dateStr = new Date(targetDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    setPendingUndo({
+      type: 'move',
+      tasks: affected,
+      fromDate,
+      toDate: targetDate,
+      message: `${affected.length} task${affected.length !== 1 ? 's' : ''} moved to ${dateStr}`,
+      key: Date.now(),
+      timerReady: false,
+    })
+    setSelectedIds(new Set())
+    // Move in Supabase FIRST — saveLogByDate (triggered by updateLog below) deletes tasks
+    // from the source log by log_id. If we moved them first, their log_id is already
+    // the target's, so saveLogByDate won't touch them.
+    await moveTasksToDate(ids, targetDate)
+    updateLog(prev => ({ ...prev, tasks: prev.tasks.filter(t => !new Set(ids).has(t.id)) }))
+    cache.current.delete(targetDate)
+    navigateTo(targetDate)
+  }
+
+  async function handleUndo() {
+    if (!pendingUndo) return
+    const { type, tasks } = pendingUndo
+    if (type === 'complete') {
+      const taskMap = new Map(tasks.map(t => [t.id, t]))
+      updateLog(prev => ({
+        ...prev,
+        tasks: prev.tasks.map(t => taskMap.has(t.id) ? { ...taskMap.get(t.id)! } : t),
+      }))
+    } else if (type === 'delete') {
+      updateLog(prev => ({ ...prev, tasks: [...tasks, ...prev.tasks] }))
+    } else if (type === 'move' && pendingUndo.fromDate && pendingUndo.toDate) {
+      const ids = tasks.map(t => t.id)
+      await moveTasksToDate(ids, pendingUndo.fromDate)
+      cache.current.delete(pendingUndo.fromDate)
+      cache.current.delete(pendingUndo.toDate)
+      navigateTo(pendingUndo.fromDate)
+    }
   }
 
   function handleNoteChange(note: string) {
@@ -447,6 +550,8 @@ function Dashboard() {
                     onToggleStar={handleToggleStar}
                     onUpdateTags={handleUpdateTags}
                     onUpdateText={handleUpdateText}
+                    selectedIds={selectedIds}
+                    onSelectionChange={setSelectedIds}
                   />
                   {totalTasks > 0 && (
                     <div className="mt-8 pt-4 border-t border-zinc-900">
@@ -487,6 +592,28 @@ function Dashboard() {
             navigateTo(date)
             setActiveTab('daily')
           }}
+        />
+      )}
+
+      {selectedIds.size > 0 && activeTab === 'daily' && (
+        <BulkActionFooter
+          selectedCount={selectedIds.size}
+          today={today}
+          onComplete={handleBulkComplete}
+          onMoveToTomorrow={() => handleBulkMoveToDate(offsetLocalDate(viewedDate, 1))}
+          onMoveToDate={handleBulkMoveToDate}
+          onDelete={handleBulkDelete}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
+
+      {pendingUndo && (
+        <ActionToast
+          key={pendingUndo.key}
+          message={pendingUndo.message}
+          onUndo={handleUndo}
+          onClose={() => setPendingUndo(null)}
+          startTimer={pendingUndo.timerReady}
         />
       )}
 

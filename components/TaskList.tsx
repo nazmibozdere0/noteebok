@@ -15,9 +15,11 @@ interface TaskListProps {
   onToggleStar: (id: string) => void
   onUpdateTags: (id: string, tags: string[]) => void
   onUpdateText: (id: string, text: string) => void
+  selectedIds: Set<string>
+  onSelectionChange: (ids: Set<string>) => void
 }
 
-export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUpdateTags, onUpdateText }: TaskListProps) {
+export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUpdateTags, onUpdateText, selectedIds, onSelectionChange }: TaskListProps) {
   // Tracks tasks in the middle of their completion animation.
   // They stay rendered in the pending list while animating, then disappear when onToggle fires.
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set())
@@ -30,6 +32,48 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
 
   // Tracks tasks that just landed back in the pending section — triggers entrance animation.
   const [newlyUncompletedIds, setNewlyUncompletedIds] = useState<Set<string>>(new Set())
+
+  // Drag-select refs — use refs (not state) to avoid re-render on every mouse move
+  const isDragging = useRef(false)
+  const dragStartId = useRef<string | null>(null)
+  const dragDidMove = useRef(false)
+  const selectedRef = useRef(selectedIds)
+  selectedRef.current = selectedIds
+  const onSelectionChangeRef = useRef(onSelectionChange)
+  onSelectionChangeRef.current = onSelectionChange
+
+  useEffect(() => {
+    function handleMouseUp() {
+      if (isDragging.current && !dragDidMove.current && dragStartId.current) {
+        // Pure click — toggle selection for the mousedown'd row
+        const next = new Set(selectedRef.current)
+        const id = dragStartId.current
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        onSelectionChangeRef.current(next)
+      }
+      isDragging.current = false
+      dragStartId.current = null
+      dragDidMove.current = false
+    }
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => window.removeEventListener('mouseup', handleMouseUp)
+  }, [])
+
+  function handleDragStart(id: string) {
+    isDragging.current = true
+    dragStartId.current = id
+    dragDidMove.current = false
+  }
+
+  function handleDragEnter(id: string) {
+    if (!isDragging.current || id === dragStartId.current) return
+    dragDidMove.current = true
+    const next = new Set(selectedRef.current)
+    if (dragStartId.current) next.add(dragStartId.current)
+    next.add(id)
+    onSelectionChangeRef.current(next)
+  }
 
   function handleToggleClick(task: Task) {
     if (task.done) {
@@ -82,11 +126,14 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
               uncompleting={false}
               newlyCompleted={false}
               newlyUncompleted={newlyUncompleted}
+              selected={selectedIds.has(task.id)}
               onToggle={() => handleToggleClick(task)}
               onDelete={onDelete}
               onToggleStar={onToggleStar}
               onUpdateTags={onUpdateTags}
               onUpdateText={onUpdateText}
+              onDragStart={handleDragStart}
+              onDragEnter={handleDragEnter}
             />
           </CollapsingRow>
         )
@@ -107,11 +154,14 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
                 uncompleting={uncompletingIds.has(task.id)}
                 newlyCompleted={newlyCompletedIds.has(task.id)}
                 newlyUncompleted={false}
+                selected={selectedIds.has(task.id)}
                 onToggle={() => handleToggleClick(task)}
                 onDelete={onDelete}
                 onToggleStar={onToggleStar}
                 onUpdateTags={onUpdateTags}
                 onUpdateText={onUpdateText}
+                onDragStart={handleDragStart}
+                onDragEnter={handleDragEnter}
               />
             </CollapsingRow>
           ))}
@@ -173,22 +223,28 @@ function TaskRow({
   uncompleting,
   newlyCompleted,
   newlyUncompleted,
+  selected,
   onToggle,
   onDelete,
   onToggleStar,
   onUpdateTags,
   onUpdateText,
+  onDragStart,
+  onDragEnter,
 }: {
   task: Task
   completing: boolean
   uncompleting: boolean
   newlyCompleted: boolean
   newlyUncompleted: boolean
+  selected: boolean
   onToggle: () => void
   onDelete: (id: string) => void
   onToggleStar: (id: string) => void
   onUpdateTags: (id: string, tags: string[]) => void
   onUpdateText: (id: string, text: string) => void
+  onDragStart: (id: string) => void
+  onDragEnter: (id: string) => void
 }) {
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -264,19 +320,21 @@ function TaskRow({
   return (
     <div
       onDoubleClick={!visuallyDone && !editing ? startEdit : undefined}
-      onMouseDown={startPress}
+      onMouseDown={(e) => { startPress(); if (!editing) onDragStart(task.id) }}
       onMouseUp={cancelPress}
       onMouseLeave={cancelPress}
+      onMouseEnter={() => onDragEnter(task.id)}
       onTouchStart={startPress}
       onTouchEnd={cancelPress}
       className={[
-        'group relative flex items-center gap-2 px-2 py-1.5 rounded-lg',
+        'group relative flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors duration-150',
         newlyCompleted ? 'task-slide-in' : '',
         newlyUncompleted ? 'task-slide-in-from-below' : '',
         completing ? 'task-exiting' : '',
         uncompleting ? 'task-exiting-up' : '',
-        !completing && !uncompleting && !newlyCompleted && !newlyUncompleted
-          ? 'hover:bg-zinc-900 transition-colors duration-150'
+        selected ? 'bg-indigo-950/40 ring-1 ring-inset ring-indigo-500/25' : '',
+        !selected && !completing && !uncompleting && !newlyCompleted && !newlyUncompleted
+          ? 'hover:bg-zinc-900'
           : '',
       ].filter(Boolean).join(' ')}
     >

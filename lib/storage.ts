@@ -233,6 +233,36 @@ export async function getStarredTasks(): Promise<StarredTask[]> {
   }))
 }
 
+// ─── Bulk move ────────────────────────────────────────────────────────────────
+
+export async function moveTasksToDate(taskIds: string[], targetDate: string): Promise<void> {
+  const supabase = createClient()
+  const userId = await getUserId()
+
+  let { data: log } = await supabase
+    .from('daily_logs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('date', targetDate)
+    .maybeSingle()
+
+  if (!log) {
+    const { data: created } = await supabase
+      .from('daily_logs')
+      .insert({ user_id: userId, date: targetDate, note: '' })
+      .select('id')
+      .single()
+    log = created
+  }
+
+  if (!log) return
+
+  await supabase
+    .from('tasks')
+    .update({ log_id: log.id, log_date: targetDate })
+    .in('id', taskIds)
+}
+
 export async function getGlobalStarredCount(): Promise<number> {
   const supabase = createClient()
   const userId = await getUserId()
