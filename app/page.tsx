@@ -223,6 +223,21 @@ function Dashboard() {
     getGlobalStarredCount().then(setGlobalStarredCount)
   }, [log])
 
+  // Keyboard shortcuts — daily tab only, suppressed when typing in any input/textarea
+  useEffect(() => {
+    if (activeTab !== 'daily') return
+    function handleKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'ArrowLeft') navigateTo(offsetLocalDate(viewedDate, -1))
+      else if (e.key === 'ArrowRight') navigateTo(offsetLocalDate(viewedDate, 1))
+      else if (e.key === 't' || e.key === 'T') { if (viewedDate !== today) navigateTo(today) }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [activeTab, viewedDate, today])
+
   function updateLog(updater: (prev: DailyLog) => DailyLog) {
     setLog(prev => {
       const next = updater(prev)
