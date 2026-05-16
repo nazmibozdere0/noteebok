@@ -100,6 +100,7 @@ export async function saveLogByDate(log: DailyLog): Promise<void> {
         id: t.id,
         user_id: userId,
         log_id: logRow.id,
+        log_date: log.date,
         text: t.text,
         done: t.done,
         done_at: t.doneAt ?? null,

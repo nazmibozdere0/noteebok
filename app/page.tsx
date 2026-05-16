@@ -84,8 +84,25 @@ export default function Root() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data }) => setSession(!!data.session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(!!s))
+
+    async function upsertProfile(s: import('@supabase/supabase-js').Session | null) {
+      if (!s) return
+      await supabase.from('user_profiles').upsert(
+        { id: s.user.id, email: s.user.email ?? '', last_sign_in_at: new Date().toISOString() },
+        { onConflict: 'id', ignoreDuplicates: false }
+      )
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(!!data.session)
+      upsertProfile(data.session)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(!!s)
+      if (_e === 'SIGNED_IN') upsertProfile(s)
+    })
+
     return () => subscription.unsubscribe()
   }, [])
 
