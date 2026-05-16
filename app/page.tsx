@@ -328,25 +328,35 @@ function Dashboard() {
 
           {/* Date navigation */}
           <div className="mb-8">
-            <div className="flex items-center gap-2 relative">
+            <div className="relative inline-flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-2 py-2">
               <button
                 onClick={() => navigateTo(offsetLocalDate(viewedDate, -1))}
-                className="p-1 text-zinc-600 hover:text-zinc-300 rounded-lg hover:bg-zinc-900 transition-all duration-150"
+                className="p-1.5 text-zinc-400 hover:text-white rounded-xl hover:bg-zinc-800 transition-all duration-150"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={15} />
               </button>
-              <button onClick={() => setCalOpen(o => !o)} className="flex items-center gap-2 group">
-                <h1 className="w-[340px] text-3xl font-light text-white tracking-tight group-hover:text-zinc-200 transition-colors">
-                  {formatHeaderDate(viewedDate)}
-                </h1>
-                <CalendarDays size={15} className="text-zinc-700 group-hover:text-zinc-400 transition-colors mt-1" />
-              </button>
+
+              <h1 className="px-3 text-2xl font-light text-white tracking-tight whitespace-nowrap">
+                {formatHeaderDate(viewedDate)}
+              </h1>
+
               <button
                 onClick={() => navigateTo(offsetLocalDate(viewedDate, 1))}
-                className="p-1 text-zinc-600 hover:text-zinc-300 rounded-lg hover:bg-zinc-900 transition-all duration-150"
+                className="p-1.5 text-zinc-400 hover:text-white rounded-xl hover:bg-zinc-800 transition-all duration-150"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={15} />
               </button>
+
+              <div className="w-px h-4 bg-zinc-800 mx-1" />
+
+              <button
+                onClick={() => setCalOpen(o => !o)}
+                className={`p-1.5 rounded-xl transition-all duration-150
+                  ${calOpen ? 'text-indigo-400 bg-indigo-500/15' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+              >
+                <CalendarDays size={15} />
+              </button>
+
               {calOpen && (
                 <CalendarPopover
                   viewedDate={viewedDate}
@@ -356,7 +366,8 @@ function Dashboard() {
                 />
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1">
+
+            <div className="flex items-center gap-2 mt-2 pl-1">
               <p className="text-sm text-zinc-500">{getSubtitle(viewedDate, today)}</p>
               {!isToday && (
                 <button
