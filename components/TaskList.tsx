@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Task } from '@/lib/types'
 import { getDayAge, cleanText } from '@/lib/hygiene'
 import { CheckCircle2, Circle, Flame, Trash2, Star, Tag } from 'lucide-react'
@@ -14,9 +14,10 @@ interface TaskListProps {
   onDelete: (id: string) => void
   onToggleStar: (id: string) => void
   onUpdateTags: (id: string, tags: string[]) => void
+  onUpdateText: (id: string, text: string) => void
 }
 
-export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUpdateTags }: TaskListProps) {
+export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUpdateTags, onUpdateText }: TaskListProps) {
   // Tracks tasks in the middle of their completion animation.
   // They stay rendered in the pending list while animating, then disappear when onToggle fires.
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set())
@@ -85,6 +86,7 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
               onDelete={onDelete}
               onToggleStar={onToggleStar}
               onUpdateTags={onUpdateTags}
+              onUpdateText={onUpdateText}
             />
           </CollapsingRow>
         )
@@ -109,6 +111,7 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
                 onDelete={onDelete}
                 onToggleStar={onToggleStar}
                 onUpdateTags={onUpdateTags}
+                onUpdateText={onUpdateText}
               />
             </CollapsingRow>
           ))}
@@ -174,6 +177,7 @@ function TaskRow({
   onDelete,
   onToggleStar,
   onUpdateTags,
+  onUpdateText,
 }: {
   task: Task
   completing: boolean
@@ -184,8 +188,49 @@ function TaskRow({
   onDelete: (id: string) => void
   onToggleStar: (id: string) => void
   onUpdateTags: (id: string, tags: string[]) => void
+  onUpdateText: (id: string, text: string) => void
 }) {
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fillTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fillRef = useRef<HTMLDivElement>(null)
+
+  const PRESS_DELAY = 150
+  const PRESS_DURATION = 500
+
+  function startPress() {
+    if (visuallyDone || editing) return
+    fillTimer.current = setTimeout(() => {
+      const fill = fillRef.current
+      if (!fill) return
+      fill.style.transition = 'none'
+      fill.style.width = '0%'
+      fill.style.opacity = '1'
+      requestAnimationFrame(() => {
+        fill.style.transition = `width ${PRESS_DURATION}ms linear`
+        fill.style.width = '100%'
+      })
+    }, PRESS_DELAY)
+    pressTimer.current = setTimeout(() => {
+      const fill = fillRef.current
+      if (fill) { fill.style.width = '0%'; fill.style.opacity = '0'; fill.style.transition = 'none' }
+      onToggle()
+    }, PRESS_DELAY + PRESS_DURATION)
+  }
+
+  function cancelPress() {
+    if (fillTimer.current) { clearTimeout(fillTimer.current); fillTimer.current = null }
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
+    const fill = fillRef.current
+    if (!fill) return
+    fill.style.transition = 'none'
+    fill.style.width = '0%'
+    fill.style.opacity = '0'
+  }
+
   const age = getDayAge(task.createdAt)
   const isStale = !task.done && !completing && !uncompleting && age >= 3
   const tags = task.tags ?? []
@@ -193,21 +238,60 @@ function TaskRow({
   const displayText = cleanText(task.text)
   const visuallyDone = task.done || completing
 
+  function startEdit() {
+    if (visuallyDone) return
+    setEditValue(displayText)
+    setEditing(true)
+  }
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  const commitEdit = useCallback(() => {
+    if (editValue.trim() && editValue.trim() !== displayText) {
+      onUpdateText(task.id, editValue.trim())
+    }
+    setEditing(false)
+  }, [editValue, displayText, task.id, onUpdateText])
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
+    if (e.key === 'Escape') { setEditing(false) }
+  }
+
   return (
     <div
+      onDoubleClick={!visuallyDone && !editing ? startEdit : undefined}
+      onMouseDown={startPress}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
       className={[
-        'group flex items-center gap-2 px-2 py-1.5 rounded-lg',
+        'group relative flex items-center gap-2 px-2 py-1.5 rounded-lg overflow-hidden',
         newlyCompleted ? 'task-slide-in' : '',
         newlyUncompleted ? 'task-slide-in-from-below' : '',
         completing ? 'task-exiting' : '',
         uncompleting ? 'task-exiting-up' : '',
         !completing && !uncompleting && !newlyCompleted && !newlyUncompleted
-          ? (task.done ? 'opacity-40 transition-opacity duration-150' : 'hover:bg-zinc-900 transition-colors duration-150')
+          ? 'hover:bg-zinc-900 transition-colors duration-150'
           : '',
       ].filter(Boolean).join(' ')}
     >
+      <div
+        ref={fillRef}
+        className="absolute inset-y-0 left-0 rounded-lg pointer-events-none"
+        style={{
+          width: '0%',
+          opacity: 0,
+          background: 'linear-gradient(90deg, rgba(34,197,94,0.35), rgba(34,197,94,0.12))',
+        }}
+      />
       <button
         onClick={onToggle}
+        onDoubleClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
         className={`flex-shrink-0 transition-colors duration-200
           ${visuallyDone ? 'text-emerald-500' : 'text-zinc-600 hover:text-zinc-300'}`}
       >
@@ -215,26 +299,40 @@ function TaskRow({
       </button>
 
       <div className="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
-        <span className={`text-sm leading-snug transition-all duration-200
-          ${visuallyDone ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
-          {displayText}
-        </span>
-        {mentions.map(m => <PersonChip key={m} name={m} />)}
-        <TagChips tags={tags} limit={2} />
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={handleKeyDown}
+            className="flex-1 bg-transparent text-sm text-zinc-200 outline-none border-b border-zinc-600 focus:border-indigo-500 transition-colors duration-150 py-0.5 min-w-0"
+          />
+        ) : (
+          <>
+            <span className={`text-sm leading-snug transition-all duration-200 select-none
+              ${visuallyDone ? 'line-through text-zinc-400' : 'text-zinc-200'}`}
+            >
+              {displayText}
+            </span>
+            {mentions.map(m => <PersonChip key={m} name={m} />)}
+            <TagChips tags={tags} limit={2} />
+          </>
+        )}
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {isStale && (
+      <div className="flex items-center gap-2 flex-shrink-0" onDoubleClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+        {isStale && !editing && (
           <span title={`${age}d old`} className="text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity">
             <Flame size={13} />
           </span>
         )}
-        {!visuallyDone && (
+        {!visuallyDone && !editing && (
           <span className="text-[10px] text-zinc-600 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
             {age}d
           </span>
         )}
-        {!visuallyDone && (
+        {!editing && (
           <div className="relative">
             <button
               type="button"
@@ -257,21 +355,25 @@ function TaskRow({
             )}
           </div>
         )}
-        <button
-          onClick={() => onToggleStar(task.id)}
-          className={`p-1 rounded-md transition-all duration-150
-            ${task.starred
-              ? 'text-amber-400 hover:text-amber-300'
-              : 'text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-amber-400 hover:bg-amber-500/10'}`}
-        >
-          <Star size={13} fill={task.starred ? 'currentColor' : 'none'} />
-        </button>
-        <button
-          onClick={() => onDelete(task.id)}
-          className="p-1 rounded-md text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
-        >
-          <Trash2 size={13} />
-        </button>
+        {!editing && (
+          <button
+            onClick={() => onToggleStar(task.id)}
+            className={`p-1 rounded-md transition-all duration-150
+              ${task.starred
+                ? 'text-amber-400 hover:text-amber-300'
+                : 'text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-amber-400 hover:bg-amber-500/10'}`}
+          >
+            <Star size={13} fill={task.starred ? 'currentColor' : 'none'} />
+          </button>
+        )}
+        {!editing && (
+          <button
+            onClick={() => onDelete(task.id)}
+            className="p-1 rounded-md text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
     </div>
   )

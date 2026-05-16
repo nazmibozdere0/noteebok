@@ -260,6 +260,16 @@ function Dashboard() {
     }))
   }
 
+  function handleUpdateText(id: string, text: string) {
+    if (!text.trim()) return
+    updateLog(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t =>
+        t.id === id ? { ...t, text: text.trim(), mentions: extractMentions(text) } : t
+      ),
+    }))
+  }
+
   function handleDeleteTask(id: string) {
     updateLog(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }))
   }
@@ -381,6 +391,7 @@ function Dashboard() {
                     onDelete={handleDeleteTask}
                     onToggleStar={handleToggleStar}
                     onUpdateTags={handleUpdateTags}
+                    onUpdateText={handleUpdateText}
                   />
                   {totalTasks > 0 && (
                     <div className="mt-8 pt-4 border-t border-zinc-900">
