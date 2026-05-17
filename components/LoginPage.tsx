@@ -112,9 +112,9 @@ function usePreviewAnimation() {
 
               // ── Task 2 ──────────────────────────────────────────────────────
               after(() => {
-                type('abc', 160, () => {
+                type('decide whether lost notes or noteebok', 55, () => {
                   after(() => {
-                    const t2 = addTask('abc', [])  // intentionally lowercase placeholder
+                    const t2 = addTask('decide whether lost notes or noteebok', [])
 
                     // Complete T1 (green bar → done)
                     after(() => {
