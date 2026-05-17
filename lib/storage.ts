@@ -278,6 +278,49 @@ export async function getGlobalStarredCount(): Promise<number> {
 
 // ─── Settings (stays in localStorage — user preference, not user data) ────────
 
+// ─── User profile ─────────────────────────────────────────────────────────────
+
+export interface UserProfile {
+  firstName: string
+  lastName: string
+  email: string
+  avatar: string
+}
+
+export async function getProfile(): Promise<UserProfile> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return { firstName: '', lastName: '', email: '', avatar: '' }
+
+  const { data } = await supabase
+    .from('user_profiles')
+    .select('first_name, last_name, email')
+    .eq('id', session.user.id)
+    .maybeSingle()
+
+  return {
+    firstName: data?.first_name ?? '',
+    lastName: data?.last_name ?? '',
+    email: data?.email ?? session.user.email ?? '',
+    avatar: session.user.user_metadata?.avatar_url ?? '',
+  }
+}
+
+export async function updateProfile(firstName: string, lastName: string): Promise<void> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ first_name: firstName.trim(), last_name: lastName.trim() })
+    .eq('id', session.user.id)
+
+  if (error) throw error
+}
+
+// ─── Settings (stays in localStorage — user preference, not user data) ────────
+
 export function getApiKey(): string {
   if (typeof window === 'undefined') return ''
   return localStorage.getItem('focus_engine_settings_apikey') || ''

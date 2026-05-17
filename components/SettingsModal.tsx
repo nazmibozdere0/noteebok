@@ -1,71 +1,135 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Key, Eye, EyeOff } from 'lucide-react'
-import { getApiKey, saveApiKey } from '@/lib/storage'
+import { useState, useEffect, useRef } from 'react'
+import { X, Sparkles, Tags, User } from 'lucide-react'
+import type { SectionProps } from './settings/types'
+import GeminiSettings from './settings/GeminiSettings'
+import TagManagerSettings from './settings/TagManagerSettings'
+import ProfileSettings from './settings/ProfileSettings'
+
+// ─── Section registry — add new sections here only ───────────────────────────
+
+interface Section {
+  id: string
+  label: string
+  icon: React.ComponentType<{ size?: number; className?: string }>
+  component: React.ComponentType<SectionProps>
+}
+
+const SECTIONS: Section[] = [
+  { id: 'profile', label: 'Profile',     icon: User,     component: ProfileSettings },
+  { id: 'tags',    label: 'Tag Manager', icon: Tags,     component: TagManagerSettings },
+  { id: 'gemini',  label: 'Gemini API',  icon: Sparkles, component: GeminiSettings },
+]
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
 interface SettingsModalProps {
   onClose: () => void
 }
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
-  const [key, setKey] = useState(getApiKey)
-  const [show, setShow] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [activeId, setActiveId] = useState(SECTIONS[0].id)
+  const [isDirty, setIsDirty] = useState(false)
+  const [saveSignal, setSaveSignal] = useState(0)
+  const [cancelSignal, setCancelSignal] = useState(0)
+
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCloseRef.current()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
+
+  function handleSectionChange(id: string) {
+    setActiveId(id)
+    setIsDirty(false)
+  }
 
   function handleSave() {
-    saveApiKey(key.trim())
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaveSignal(s => s + 1)
+    setIsDirty(false)
   }
+
+  function handleCancel() {
+    setCancelSignal(c => c + 1)
+    setIsDirty(false)
+  }
+
+  const ActiveSection = SECTIONS.find(s => s.id === activeId)!.component
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-base font-medium text-white">Settings</h2>
-          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
-            <X size={16} />
-          </button>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={onClose} />
+
+      <div className="relative flex w-full max-w-3xl h-[540px] bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
+
+        {/* ── Left sidebar ── */}
+        <div className="w-52 flex-shrink-0 border-r border-zinc-800/60 py-5 flex flex-col">
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-zinc-600 px-5 mb-3">
+            Settings
+          </p>
+          <nav className="flex-1 px-2 space-y-0.5">
+            {SECTIONS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => handleSectionChange(id)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 text-left
+                  ${activeId === id
+                    ? 'bg-zinc-800 text-white'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'}`}
+              >
+                <Icon size={14} className="flex-shrink-0" />
+                {label}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase text-zinc-500 mb-2">
-              <Key size={11} />
-              Gemini API Key
-            </label>
-            <div className="relative">
-              <input
-                type={show ? 'text' : 'password'}
-                value={key}
-                onChange={e => setKey(e.target.value)}
-                placeholder="AIza…"
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 rounded-xl
-                           px-4 py-3 pr-10 text-sm text-white placeholder-zinc-600 outline-none
-                           transition-colors font-mono"
-              />
-              <button
-                type="button"
-                onClick={() => setShow(s => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-300 transition-colors"
-              >
-                {show ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-            <p className="text-xs text-zinc-600 mt-2">
-              Stored in localStorage only — never sent anywhere except Gemini.
-            </p>
+        {/* ── Right panel ── */}
+        <div className="flex-1 flex flex-col min-w-0">
+
+          {/* Top bar with close button */}
+          <div className="flex items-center justify-end px-6 pt-5 pb-2 flex-shrink-0">
+            <button
+              onClick={onClose}
+              className="text-zinc-600 hover:text-zinc-300 transition-colors"
+              title="Close"
+            >
+              <X size={16} />
+            </button>
           </div>
 
-          <button
-            onClick={handleSave}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-xl
-                       transition-all duration-150 font-medium"
-          >
-            {saved ? 'Saved ✓' : 'Save Key'}
-          </button>
+          {/* Section content */}
+          <div className="flex-1 overflow-y-auto px-6 pb-4">
+            <ActiveSection
+              onDirtyChange={setIsDirty}
+              saveSignal={saveSignal}
+              cancelSignal={cancelSignal}
+            />
+          </div>
+
+          {/* Footer — appears only when there are unsaved changes */}
+          {isDirty && (
+            <div className="flex-shrink-0 border-t border-zinc-800 px-6 py-4 flex items-center justify-end gap-3">
+              <button
+                onClick={handleCancel}
+                className="text-sm px-4 py-2 rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all duration-150"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="text-sm px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-all duration-150"
+              >
+                Save changes
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

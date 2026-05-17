@@ -248,6 +248,7 @@ function Dashboard() {
     if (activeTab !== 'daily') return
     function handleKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName
+      if (e.key === 'Escape') { setSelectedIds(new Set()); return }
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'ArrowLeft') navigateTo(offsetLocalDate(viewedDate, -1))

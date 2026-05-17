@@ -37,6 +37,10 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
   const isDragging = useRef(false)
   const dragStartId = useRef<string | null>(null)
   const dragDidMove = useRef(false)
+  // Ordered path of IDs selected in the current drag (for bidirectional unselect)
+  const dragPath = useRef<string[]>([])
+  // Selection state before this drag started (never removed during drag)
+  const preExistingIds = useRef<Set<string>>(new Set())
   const selectedRef = useRef(selectedIds)
   selectedRef.current = selectedIds
   const onSelectionChangeRef = useRef(onSelectionChange)
@@ -55,6 +59,8 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
       isDragging.current = false
       dragStartId.current = null
       dragDidMove.current = false
+      dragPath.current = []
+      document.body.style.userSelect = ''
     }
     window.addEventListener('mouseup', handleMouseUp)
     return () => window.removeEventListener('mouseup', handleMouseUp)
@@ -64,14 +70,37 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
     isDragging.current = true
     dragStartId.current = id
     dragDidMove.current = false
+    dragPath.current = []
+    preExistingIds.current = new Set(selectedRef.current)
+    document.body.style.userSelect = 'none'
   }
 
   function handleDragEnter(id: string) {
-    if (!isDragging.current || id === dragStartId.current) return
+    if (!isDragging.current) return
+    // Ignore jitter re-entering the current last item in path
+    if (id === dragPath.current[dragPath.current.length - 1]) return
+
     dragDidMove.current = true
-    const next = new Set(selectedRef.current)
-    if (dragStartId.current) next.add(dragStartId.current)
-    next.add(id)
+
+    // Populate path with start item on first real move
+    if (dragPath.current.length === 0 && dragStartId.current) {
+      dragPath.current = [dragStartId.current]
+    }
+
+    const path = dragPath.current
+    const existingIndex = path.indexOf(id)
+
+    if (existingIndex !== -1) {
+      // Backtracking — trim path back to this point and deselect the removed items
+      path.splice(existingIndex + 1)
+    } else {
+      // Forward — extend path
+      path.push(id)
+    }
+
+    // Rebuild selection: pre-existing items + current drag path
+    const next = new Set(preExistingIds.current)
+    for (const pid of path) next.add(pid)
     onSelectionChangeRef.current(next)
   }
 
