@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { CheckCircle2, Circle, Plus } from 'lucide-react'
+import { CheckCircle2, Circle, Plus, X } from 'lucide-react'
 import { localDateISO, offsetLocalDate } from '@/lib/hygiene'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -369,6 +369,75 @@ function PreviewPanel() {
   )
 }
 
+// ─── Privacy Policy Modal ─────────────────────────────────────────────────────
+
+function PrivacyModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-zinc-800 flex-shrink-0">
+          <h2 className="text-sm font-semibold text-white">Privacy Policy</h2>
+          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 text-sm text-zinc-400 leading-relaxed space-y-5">
+          <p className="text-zinc-600 text-xs">Last updated: May 18, 2026</p>
+
+          <section>
+            <h3 className="text-zinc-200 font-medium mb-1">1. Overview</h3>
+            <p>noteebok (&quot;we&quot;, &quot;our&quot;, or &quot;the app&quot;) is a personal productivity tool. We respect your privacy and are committed to being transparent about the data we collect and how we use it.</p>
+          </section>
+
+          <section>
+            <h3 className="text-zinc-200 font-medium mb-1">2. Information We Collect</h3>
+            <p>When you sign in with Google, we receive the following from your Google account:</p>
+            <ul className="list-disc list-inside mt-1.5 space-y-1 text-zinc-400">
+              <li>Your name</li>
+              <li>Your email address</li>
+              <li>Your profile photo</li>
+            </ul>
+            <p className="mt-2">This information is used solely to identify your account within noteebok.</p>
+          </section>
+
+          <section>
+            <h3 className="text-zinc-200 font-medium mb-1">3. How Your Information Is Used</h3>
+            <p>We use your information only to provide the noteebok service. We do not sell, rent, or share your personal information with third parties for marketing purposes.</p>
+          </section>
+
+          <section>
+            <h3 className="text-zinc-200 font-medium mb-1">4. How Your Information Is Stored</h3>
+            <p>Your account data is stored securely using Supabase, a third-party backend-as-a-service provider. Your task data and notes are stored in your Supabase-backed database.</p>
+            <p className="mt-2">If you use the AI features of noteebok, your Google Gemini API key is stored only in your browser&apos;s localStorage. It is never sent to our servers.</p>
+          </section>
+
+          <section>
+            <h3 className="text-zinc-200 font-medium mb-1">5. Your Rights</h3>
+            <p>You have the right to request deletion of your personal data at any time. To do so, contact us at <a href="mailto:nazmibozdere0@gmail.com" className="text-indigo-400 hover:text-indigo-300 transition-colors">nazmibozdere0@gmail.com</a>. We will process deletion requests within 7 days.</p>
+          </section>
+
+          <section>
+            <h3 className="text-zinc-200 font-medium mb-1">6. Third-Party Services</h3>
+            <p>noteebok relies on the following third-party services:</p>
+            <ul className="list-disc list-inside mt-1.5 space-y-1 text-zinc-400">
+              <li>Google OAuth — for authentication</li>
+              <li>Supabase — for data storage</li>
+              <li>Google Gemini — for AI features (optional)</li>
+            </ul>
+            <p className="mt-2">Each of these services has its own privacy policy and terms of use.</p>
+          </section>
+
+          <section>
+            <h3 className="text-zinc-200 font-medium mb-1">7. Contact</h3>
+            <p>If you have any questions about this privacy policy, please contact us at <a href="mailto:nazmibozdere0@gmail.com" className="text-indigo-400 hover:text-indigo-300 transition-colors">nazmibozdere0@gmail.com</a>.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Google icon ──────────────────────────────────────────────────────────────
 
 function GoogleIcon() {
@@ -385,8 +454,9 @@ function GoogleIcon() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [loading, setLoading]   = useState(false)
+  const [isSignUp, setIsSignUp]       = useState(false)
+  const [loading, setLoading]         = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
   const supabase = createClient()
 
   async function handleGoogle() {
@@ -400,6 +470,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-black flex overflow-hidden">
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
 
       {/* ── Left: action area ─────────────────────────────────────────────────── */}
       <div className="relative w-[400px] flex-shrink-0 flex flex-col">
@@ -449,6 +520,16 @@ export default function LoginPage() {
               </button>
             </p>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-10 py-5 flex-shrink-0 flex items-center justify-center">
+          <button
+            onClick={() => setShowPrivacy(true)}
+            className="text-xs text-zinc-700 hover:text-zinc-500 transition-colors duration-150"
+          >
+            Privacy Policy
+          </button>
         </div>
       </div>
 
