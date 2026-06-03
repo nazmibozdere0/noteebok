@@ -473,7 +473,9 @@ function Dashboard() {
               <div className="mb-8">
                 <div className="flex items-center justify-between">
                   <h1 className="text-3xl tracking-tight whitespace-nowrap select-none">
-                    <span className="font-semibold text-white">{formatHeaderDate(viewedDate).day}</span>
+                    <span className={`font-semibold text-white${isToday ? ' underline underline-offset-4 decoration-zinc-600' : ''}`}>
+                      {formatHeaderDate(viewedDate).day}
+                    </span>
                     <span className="font-light text-zinc-500 ml-2.5">{formatHeaderDate(viewedDate).date}</span>
                   </h1>
 
