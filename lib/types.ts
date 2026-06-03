@@ -7,6 +7,8 @@ export interface Task {
   mentions: string[]
   tags: string[]
   starred: boolean
+  branch: boolean
+  parentId?: string
 }
 
 export interface DailyLog {

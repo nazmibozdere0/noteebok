@@ -24,6 +24,8 @@ function rowToTask(row: any): Task {
     starred: row.starred,
     tags: row.tags ?? [],
     mentions: row.mentions ?? [],
+    branch: row.branch ?? false,
+    parentId: row.parent_id ?? undefined,
   }
 }
 
@@ -108,6 +110,8 @@ export async function saveLogByDate(log: DailyLog): Promise<void> {
         starred: t.starred,
         tags: t.tags ?? [],
         mentions: t.mentions ?? [],
+        branch: t.branch ?? false,
+        parent_id: t.parentId ?? null,
       }))
     )
   }
@@ -139,6 +143,8 @@ export async function updateTaskAcrossLogs(
       starred: updated.starred,
       tags: updated.tags ?? [],
       mentions: updated.mentions ?? [],
+      branch: updated.branch ?? false,
+      parent_id: updated.parentId ?? null,
     }).eq('id', taskId)
   }
 }

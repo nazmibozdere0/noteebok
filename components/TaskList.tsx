@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Task } from '@/lib/types'
 import { getDayAge, cleanText } from '@/lib/hygiene'
-import { CheckCircle2, Circle, Flame, Trash2, Star, Tag } from 'lucide-react'
+import { CheckCircle2, Circle, Flame, Trash2, Star, Tag, GitBranch, Plus } from 'lucide-react'
 import TagChips from './TagChips'
 import TagPicker from './TagPicker'
 import PersonChip from './PersonChip'
@@ -15,31 +15,22 @@ interface TaskListProps {
   onToggleStar: (id: string) => void
   onUpdateTags: (id: string, tags: string[]) => void
   onUpdateText: (id: string, text: string) => void
+  onToggleBranch: (id: string) => void
+  onAddSubtask: (parentId: string, text: string) => void
   selectedIds: Set<string>
   onSelectionChange: (ids: Set<string>) => void
 }
 
-export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUpdateTags, onUpdateText, selectedIds, onSelectionChange }: TaskListProps) {
-  // Tracks tasks in the middle of their completion animation.
-  // They stay rendered in the pending list while animating, then disappear when onToggle fires.
+export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUpdateTags, onUpdateText, onToggleBranch, onAddSubtask, selectedIds, onSelectionChange }: TaskListProps) {
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set())
-
-  // Tracks tasks that just landed in the completed section — triggers entrance animation.
   const [newlyCompletedIds, setNewlyCompletedIds] = useState<Set<string>>(new Set())
-
-  // Tracks tasks being animated out of the completed section (back to pending).
   const [uncompletingIds, setUncompletingIds] = useState<Set<string>>(new Set())
-
-  // Tracks tasks that just landed back in the pending section — triggers entrance animation.
   const [newlyUncompletedIds, setNewlyUncompletedIds] = useState<Set<string>>(new Set())
 
-  // Drag-select refs — use refs (not state) to avoid re-render on every mouse move
   const isDragging = useRef(false)
   const dragStartId = useRef<string | null>(null)
   const dragDidMove = useRef(false)
-  // Ordered path of IDs selected in the current drag (for bidirectional unselect)
   const dragPath = useRef<string[]>([])
-  // Selection state before this drag started (never removed during drag)
   const preExistingIds = useRef<Set<string>>(new Set())
   const selectedRef = useRef(selectedIds)
   selectedRef.current = selectedIds
@@ -49,7 +40,6 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
   useEffect(() => {
     function handleMouseUp() {
       if (isDragging.current && !dragDidMove.current && dragStartId.current) {
-        // Pure click — toggle selection for the mousedown'd row
         const next = new Set(selectedRef.current)
         const id = dragStartId.current
         if (next.has(id)) next.delete(id)
@@ -77,12 +67,10 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
 
   function handleDragEnter(id: string) {
     if (!isDragging.current) return
-    // Ignore jitter re-entering the current last item in path
     if (id === dragPath.current[dragPath.current.length - 1]) return
 
     dragDidMove.current = true
 
-    // Populate path with start item on first real move
     if (dragPath.current.length === 0 && dragStartId.current) {
       dragPath.current = [dragStartId.current]
     }
@@ -91,14 +79,11 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
     const existingIndex = path.indexOf(id)
 
     if (existingIndex !== -1) {
-      // Backtracking — trim path back to this point and deselect the removed items
       path.splice(existingIndex + 1)
     } else {
-      // Forward — extend path
       path.push(id)
     }
 
-    // Rebuild selection: pre-existing items + current drag path
     const next = new Set(preExistingIds.current)
     for (const pid of path) next.add(pid)
     onSelectionChangeRef.current(next)
@@ -112,7 +97,6 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
     }
   }
 
-  // Called by CollapsingRow via onTransitionEnd — fires exactly when height reaches 0
   function handleCompletingCollapsed(taskId: string) {
     onToggle(taskId)
     setCompletingIds(prev => { const n = new Set(prev); n.delete(taskId); return n })
@@ -131,7 +115,18 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
     }, 400)
   }
 
-  if (tasks.length === 0) {
+  // Separate root tasks from subtasks
+  const rootTasks = tasks.filter(t => !t.parentId)
+  const subtaskMap = new Map<string, Task[]>()
+  for (const task of tasks) {
+    if (task.parentId) {
+      const arr = subtaskMap.get(task.parentId) ?? []
+      arr.push(task)
+      subtaskMap.set(task.parentId, arr)
+    }
+  }
+
+  if (rootTasks.length === 0) {
     return (
       <div className="text-center py-12 text-zinc-700 text-sm select-none">
         No tasks yet — add one above
@@ -139,8 +134,8 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
     )
   }
 
-  const pending = tasks.filter(t => !t.done)
-  const done = tasks.filter(t => t.done)
+  const pending = rootTasks.filter(t => !t.done)
+  const done = rootTasks.filter(t => t.done)
 
   return (
     <div>
@@ -148,23 +143,35 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
         const completing = completingIds.has(task.id)
         const newlyUncompleted = newlyUncompletedIds.has(task.id)
         return (
-          <CollapsingRow key={task.id} collapsing={completing} onCollapsed={() => handleCompletingCollapsed(task.id)}>
-            <TaskRow
-              task={task}
-              completing={completing}
-              uncompleting={false}
-              newlyCompleted={false}
-              newlyUncompleted={newlyUncompleted}
-              selected={selectedIds.has(task.id)}
-              onToggle={() => handleToggleClick(task)}
-              onDelete={onDelete}
-              onToggleStar={onToggleStar}
-              onUpdateTags={onUpdateTags}
-              onUpdateText={onUpdateText}
-              onDragStart={handleDragStart}
-              onDragEnter={handleDragEnter}
-            />
-          </CollapsingRow>
+          <div key={task.id}>
+            <CollapsingRow collapsing={completing} onCollapsed={() => handleCompletingCollapsed(task.id)}>
+              <TaskRow
+                task={task}
+                completing={completing}
+                uncompleting={false}
+                newlyCompleted={false}
+                newlyUncompleted={newlyUncompleted}
+                selected={selectedIds.has(task.id)}
+                onToggle={() => handleToggleClick(task)}
+                onDelete={onDelete}
+                onToggleStar={onToggleStar}
+                onUpdateTags={onUpdateTags}
+                onUpdateText={onUpdateText}
+                onToggleBranch={onToggleBranch}
+                onAddSubtask={onAddSubtask}
+                onDragStart={handleDragStart}
+                onDragEnter={handleDragEnter}
+              />
+            </CollapsingRow>
+            {task.branch && (
+              <SubtaskSection
+                subtasks={subtaskMap.get(task.id) ?? []}
+                onAdd={(text) => onAddSubtask(task.id, text)}
+                onToggle={onToggle}
+                onDelete={onDelete}
+              />
+            )}
+          </div>
         )
       })}
 
@@ -189,6 +196,8 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
                 onToggleStar={onToggleStar}
                 onUpdateTags={onUpdateTags}
                 onUpdateText={onUpdateText}
+                onToggleBranch={onToggleBranch}
+                onAddSubtask={onAddSubtask}
                 onDragStart={handleDragStart}
                 onDragEnter={handleDragEnter}
               />
@@ -200,6 +209,78 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
   )
 }
 
+// ─── Subtask section ──────────────────────────────────────────────────────────
+
+function SubtaskSection({ subtasks, onAdd, onToggle, onDelete }: {
+  subtasks: Task[]
+  onAdd: (text: string) => void
+  onToggle: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const [inputVal, setInputVal] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function handleSubmit() {
+    if (inputVal.trim()) {
+      onAdd(inputVal.trim())
+      setInputVal('')
+      inputRef.current?.focus()
+    }
+  }
+
+  return (
+    <div className="ml-5 pl-3.5 border-l border-zinc-800/70 mb-1">
+      {subtasks.map(task => (
+        <SubtaskRow key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} />
+      ))}
+      <div className="flex items-center gap-2 py-1 pr-2">
+        <Plus size={11} className="text-zinc-700 flex-shrink-0" />
+        <input
+          ref={inputRef}
+          value={inputVal}
+          onChange={e => setInputVal(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); handleSubmit() }
+          }}
+          placeholder="Add subtask…"
+          className="flex-1 bg-transparent text-xs text-zinc-400 placeholder-zinc-700 outline-none"
+        />
+      </div>
+    </div>
+  )
+}
+
+function SubtaskRow({ task, onToggle, onDelete }: {
+  task: Task
+  onToggle: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  return (
+    <div className="group flex items-center gap-2 px-1 py-1 rounded-md hover:bg-zinc-900 transition-colors duration-100">
+      <button
+        onClick={() => onToggle(task.id)}
+        className={`flex-shrink-0 transition-colors duration-200
+          ${task.done ? 'text-emerald-500' : 'text-zinc-600 hover:text-zinc-300'}`}
+      >
+        {task.done ? <CheckCircle2 size={12} /> : <Circle size={12} />}
+      </button>
+      <span className={`flex-1 text-xs leading-snug select-none
+        ${task.done ? 'line-through text-zinc-600' : 'text-zinc-400'}`}
+      >
+        {task.text}
+      </span>
+      <button
+        onClick={() => onDelete(task.id)}
+        className="p-0.5 rounded text-zinc-700 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all duration-100"
+      >
+        <Trash2 size={11} />
+      </button>
+    </div>
+  )
+}
+
+// ─── CollapsingRow ────────────────────────────────────────────────────────────
+
 // Animates a row's height to 0 using direct DOM manipulation.
 // React state cannot be used here: React 18 batches state updates inside rAF callbacks,
 // so the browser never sees the intermediate height and the CSS transition never fires.
@@ -210,7 +291,6 @@ function CollapsingRow({ collapsing, children, onCollapsed }: {
   onCollapsed: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  // Keep a ref to onCollapsed so the transitionend handler always calls the latest version
   const cbRef = useRef(onCollapsed)
   cbRef.current = onCollapsed
 
@@ -218,13 +298,10 @@ function CollapsingRow({ collapsing, children, onCollapsed }: {
     if (!collapsing || !ref.current) return
     const el = ref.current
 
-    // Reading scrollHeight forces a synchronous layout flush —
-    // the browser commits height=Xpx before we start the transition
     el.style.overflow = 'hidden'
     el.style.transition = 'none'
     el.style.height = `${el.scrollHeight}px`
 
-    // Next frame: browser has painted height=Xpx, now we can transition to 0
     const id = requestAnimationFrame(() => {
       el.style.transition = 'height 500ms cubic-bezier(0.4, 0, 0.2, 1)'
       el.style.height = '0px'
@@ -237,7 +314,6 @@ function CollapsingRow({ collapsing, children, onCollapsed }: {
     <div
       ref={ref}
       onTransitionEnd={(e) => {
-        // Guard: only fire for our own height transition, not bubbled child transitions
         if (e.target === ref.current && e.propertyName === 'height') cbRef.current()
       }}
     >
@@ -245,6 +321,8 @@ function CollapsingRow({ collapsing, children, onCollapsed }: {
     </div>
   )
 }
+
+// ─── TaskRow ──────────────────────────────────────────────────────────────────
 
 function TaskRow({
   task,
@@ -258,6 +336,8 @@ function TaskRow({
   onToggleStar,
   onUpdateTags,
   onUpdateText,
+  onToggleBranch,
+  onAddSubtask,
   onDragStart,
   onDragEnter,
 }: {
@@ -272,13 +352,15 @@ function TaskRow({
   onToggleStar: (id: string) => void
   onUpdateTags: (id: string, tags: string[]) => void
   onUpdateText: (id: string, text: string) => void
+  onToggleBranch: (id: string) => void
+  onAddSubtask: (parentId: string, text: string) => void
   onDragStart: (id: string) => void
   onDragEnter: (id: string) => void
 }) {
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const tagContainerRef = useRef<HTMLDivElement>(null)
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fillTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -331,25 +413,84 @@ function TaskRow({
   }
 
   useEffect(() => {
-    if (editing) inputRef.current?.focus()
+    if (editing) {
+      const ta = inputRef.current
+      if (!ta) return
+      ta.focus()
+      // Move cursor to end
+      ta.selectionStart = ta.selectionEnd = ta.value.length
+    }
   }, [editing])
 
+  // Auto-resize textarea in edit mode
+  useEffect(() => {
+    const ta = inputRef.current
+    if (!ta || !editing) return
+    ta.style.height = 'auto'
+    ta.style.height = `${ta.scrollHeight}px`
+  }, [editValue, editing])
+
   const commitEdit = useCallback(() => {
-    if (editValue.trim() && editValue.trim() !== displayText) {
-      onUpdateText(task.id, editValue.trim())
+    const lines = editValue.split('\n')
+    const firstLine = lines[0].trim()
+    const subtaskLines = lines.slice(1)
+      .filter(l => l.startsWith('\t') && l.slice(1).trim())
+      .map(l => l.slice(1).trim())
+
+    if (firstLine && firstLine !== displayText) {
+      onUpdateText(task.id, firstLine)
+    }
+    // Turn on branch if new subtasks are being added
+    if (subtaskLines.length > 0 && !task.branch) {
+      onToggleBranch(task.id)
+    }
+    for (const text of subtaskLines) {
+      onAddSubtask(task.id, text)
     }
     setEditing(false)
-  }, [editValue, displayText, task.id, onUpdateText])
+  }, [editValue, displayText, task.id, task.branch, onUpdateText, onToggleBranch, onAddSubtask])
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
-    if (e.key === 'Escape') { setEditing(false) }
+  function handleEditKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    const ta = e.currentTarget
+
+    if (e.key === 'Escape') { setEditing(false); return }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      commitEdit()
+      return
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const { selectionStart, value: v } = ta
+      const lineStart = v.lastIndexOf('\n', selectionStart - 1) + 1
+      const lineText = v.slice(lineStart)
+
+      if (!e.shiftKey) {
+        if (!lineText.startsWith('\t')) {
+          const next = v.slice(0, lineStart) + '\t' + v.slice(lineStart)
+          setEditValue(next)
+          requestAnimationFrame(() => {
+            ta.selectionStart = ta.selectionEnd = selectionStart + 1
+          })
+        }
+      } else {
+        if (lineText.startsWith('\t')) {
+          const next = v.slice(0, lineStart) + v.slice(lineStart + 1)
+          setEditValue(next)
+          requestAnimationFrame(() => {
+            ta.selectionStart = ta.selectionEnd = Math.max(lineStart, selectionStart - 1)
+          })
+        }
+      }
+    }
   }
 
   return (
     <div
       onDoubleClick={!visuallyDone && !editing ? startEdit : undefined}
-      onMouseDown={(e) => { startPress(); if (!editing) onDragStart(task.id) }}
+      onMouseDown={() => { startPress(); if (!editing) onDragStart(task.id) }}
       onMouseUp={cancelPress}
       onMouseLeave={cancelPress}
       onMouseEnter={() => onDragEnter(task.id)}
@@ -390,24 +531,17 @@ function TaskRow({
 
       <div className="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
         {editing ? (
-          <div className="relative flex-1 min-w-0">
-            <div aria-hidden className="absolute inset-0 flex items-center text-sm pointer-events-none whitespace-pre overflow-hidden py-0.5">
-              {editValue.split(/(@\w+|#\w+)/g).map((part, i) => {
-                if (part.startsWith('@')) return <span key={i} className="text-indigo-400">{part}</span>
-                if (part.startsWith('#')) return <span key={i} className="text-emerald-400">{part}</span>
-                return <span key={i} className="text-transparent">{part}</span>
-              })}
-              {editValue.endsWith('#') && <span className="text-zinc-500">Work</span>}
-            </div>
-            <input
+          <div className="flex-1 min-w-0">
+            <textarea
               ref={inputRef}
               value={editValue}
               onChange={e => setEditValue(e.target.value)}
               onBlur={commitEdit}
-              onKeyDown={handleKeyDown}
+              onKeyDown={handleEditKeyDown}
+              rows={1}
+              style={{ resize: 'none', overflow: 'hidden', lineHeight: '21px', caretColor: '#818cf8' }}
               className="w-full bg-transparent text-sm text-zinc-200 outline-none border-b border-zinc-600 focus:border-indigo-500 transition-colors duration-150 py-0.5"
-            />
-          </div>
+            /></div>
         ) : (
           <>
             <span className={`text-sm leading-snug transition-all duration-200 select-none
@@ -455,6 +589,19 @@ function TaskRow({
               />
             )}
           </div>
+        )}
+        {!editing && (
+          <button
+            onClick={() => onToggleBranch(task.id)}
+            onMouseDown={e => e.stopPropagation()}
+            className={`p-1 rounded-md transition-all duration-150 opacity-0 group-hover:opacity-100
+              ${task.branch
+                ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25'
+                : 'text-zinc-500 hover:text-indigo-400 hover:bg-indigo-500/10'}`}
+            title="Branch (subtasks)"
+          >
+            <GitBranch size={13} />
+          </button>
         )}
         {!editing && (
           <button

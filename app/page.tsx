@@ -270,18 +270,35 @@ function Dashboard() {
     })
   }
 
-  function handleAddTask(text: string, tags: string[], starred: boolean) {
+  function handleAddTask(text: string, tags: string[], starred: boolean, subtaskTexts?: string[]) {
     const shortcutTags = extractTagShortcuts(text)
-    const task: Task = {
-      id: generateId(),
+    const rootId = generateId()
+    const rootTask: Task = {
+      id: rootId,
       text,
       done: false,
       createdAt: new Date().toISOString(),
       mentions: extractMentions(text),
       tags: [...new Set([...tags, ...shortcutTags])],
       starred,
+      branch: (subtaskTexts?.length ?? 0) > 0,
     }
-    updateLog(prev => ({ ...prev, tasks: [task, ...prev.tasks] }))
+    if (!subtaskTexts || subtaskTexts.length === 0) {
+      updateLog(prev => ({ ...prev, tasks: [rootTask, ...prev.tasks] }))
+      return
+    }
+    const subtasks: Task[] = subtaskTexts.map(t => ({
+      id: generateId(),
+      text: t,
+      done: false,
+      createdAt: new Date().toISOString(),
+      mentions: extractMentions(t),
+      tags: [],
+      starred: false,
+      branch: false,
+      parentId: rootId,
+    }))
+    updateLog(prev => ({ ...prev, tasks: [rootTask, ...subtasks, ...prev.tasks] }))
   }
 
   function handleToggleTask(id: string) {
@@ -329,7 +346,30 @@ function Dashboard() {
 
   function handleDeleteTask(id: string) {
     setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n })
-    updateLog(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }))
+    updateLog(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id && t.parentId !== id) }))
+  }
+
+  function handleToggleBranch(id: string) {
+    updateLog(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t => t.id === id ? { ...t, branch: !t.branch } : t),
+    }))
+  }
+
+  function handleAddSubtask(parentId: string, text: string) {
+    if (!text.trim()) return
+    const task: Task = {
+      id: generateId(),
+      text: text.trim(),
+      done: false,
+      createdAt: new Date().toISOString(),
+      mentions: extractMentions(text),
+      tags: [],
+      starred: false,
+      branch: false,
+      parentId,
+    }
+    updateLog(prev => ({ ...prev, tasks: [...prev.tasks, task] }))
   }
 
   function handleBulkComplete() {
@@ -553,6 +593,8 @@ function Dashboard() {
                     onToggleStar={handleToggleStar}
                     onUpdateTags={handleUpdateTags}
                     onUpdateText={handleUpdateText}
+                    onToggleBranch={handleToggleBranch}
+                    onAddSubtask={handleAddSubtask}
                     selectedIds={selectedIds}
                     onSelectionChange={setSelectedIds}
                   />
