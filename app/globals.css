@@ -24,6 +24,29 @@ body {
   padding-right: calc(100vw - 100%);
 }
 
+/* ── Light mode: flip the zinc scale so no component needs to change ── */
+html.light {
+  color-scheme: light;
+  --color-black: oklch(1 0 0);
+  --color-white: oklch(0.141 0.005 285.823);
+  --color-zinc-950: oklch(0.985 0.002 247.839);
+  --color-zinc-900: oklch(0.967 0.001 286.375);
+  --color-zinc-800: oklch(0.92 0.004 286.32);
+  --color-zinc-700: oklch(0.871 0.006 286.286);
+  --color-zinc-600: oklch(0.705 0.015 286.067);
+  --color-zinc-500: oklch(0.552 0.016 285.938);
+  --color-zinc-400: oklch(0.442 0.017 285.786);
+  --color-zinc-300: oklch(0.37 0.013 285.805);
+  --color-zinc-200: oklch(0.274 0.006 286.618);
+  --color-zinc-100: oklch(0.21 0.006 285.885);
+  --color-zinc-50:  oklch(0.141 0.005 285.823);
+}
+
+html.light body {
+  background: oklch(0.985 0.002 247.839);
+  color: oklch(0.21 0.006 285.885);
+}
+
 /* Smooth scrollbar in modals */
 ::-webkit-scrollbar {
   width: 4px;

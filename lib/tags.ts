@@ -1,3 +1,5 @@
+import type React from 'react'
+
 const TAGS_KEY = 'focus_engine_custom_tags'
 
 export const PREDEFINED_TAGS = [
@@ -6,15 +8,16 @@ export const PREDEFINED_TAGS = [
 ]
 
 // Deterministic color assignment based on tag name so a tag always looks the same
+// Deep Muted Tones — dark backgrounds with light pastel text, no borders
 const TAG_PALETTES = [
-  { bg: 'bg-indigo-500/15',  text: 'text-indigo-300',  border: 'border-indigo-500/25'  },
-  { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/25' },
-  { bg: 'bg-amber-500/15',   text: 'text-amber-300',   border: 'border-amber-500/25'   },
-  { bg: 'bg-rose-500/15',    text: 'text-rose-300',    border: 'border-rose-500/25'    },
-  { bg: 'bg-cyan-500/15',    text: 'text-cyan-300',    border: 'border-cyan-500/25'    },
-  { bg: 'bg-violet-500/15',  text: 'text-violet-300',  border: 'border-violet-500/25'  },
-  { bg: 'bg-orange-500/15',  text: 'text-orange-300',  border: 'border-orange-500/25'  },
-  { bg: 'bg-pink-500/15',    text: 'text-pink-300',    border: 'border-pink-500/25'    },
+  { bg: '#312e81', text: '#a5b4fc' }, // indigo
+  { bg: '#064e3b', text: '#6ee7b7' }, // emerald
+  { bg: '#441a1a', text: '#fca5a5' }, // rose/coral
+  { bg: '#2d2d2d', text: '#d1d5db' }, // gray
+  { bg: '#1c1917', text: '#d6bcfa' }, // violet-ish
+  { bg: '#1e3a5f', text: '#93c5fd' }, // blue
+  { bg: '#3b1f08', text: '#fdba74' }, // orange
+  { bg: '#1a1a2e', text: '#c4b5fd' }, // purple
 ]
 
 export function getTagPalette(tag: string) {
@@ -23,9 +26,14 @@ export function getTagPalette(tag: string) {
   return TAG_PALETTES[hash % TAG_PALETTES.length]
 }
 
-export function getTagClass(tag: string): string {
+export function getTagStyle(tag: string): React.CSSProperties {
   const p = getTagPalette(tag)
-  return `${p.bg} ${p.text} ${p.border}`
+  return { backgroundColor: p.bg, color: p.text }
+}
+
+// kept for backwards compat where callers still use className-based API
+export function getTagClass(_tag: string): string {
+  return ''
 }
 
 export function getCustomTags(): string[] {

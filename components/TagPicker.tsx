@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Check, Plus, Tag } from 'lucide-react'
-import { getAllTags, saveCustomTag, getTagClass } from '@/lib/tags'
+import { getAllTags, saveCustomTag, getTagStyle } from '@/lib/tags'
 
 interface TagPickerProps {
   selected: string[]
@@ -29,10 +29,10 @@ export default function TagPicker({ selected, onChange, onClose, placement = 'up
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
-    document.addEventListener('mousedown', handleMouse)
+    document.addEventListener('click', handleMouse)
     document.addEventListener('keydown', handleKey)
     return () => {
-      document.removeEventListener('mousedown', handleMouse)
+      document.removeEventListener('click', handleMouse)
       document.removeEventListener('keydown', handleKey)
     }
   }, [onClose, containerRef])
@@ -91,7 +91,10 @@ export default function TagPicker({ selected, onChange, onClose, placement = 'up
                          transition-colors duration-100
                          ${isSelected ? 'bg-zinc-800/60' : 'hover:bg-zinc-800/40'}`}
             >
-              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md border ${getTagClass(tag)}`}>
+              <span
+                style={getTagStyle(tag)}
+                className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+              >
                 {tag}
               </span>
               {isSelected && <Check size={12} className="text-indigo-400" />}

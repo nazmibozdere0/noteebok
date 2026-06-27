@@ -6,7 +6,6 @@ import LoginPage from '@/components/LoginPage'
 import Header, { Tab } from '@/components/Header'
 import TaskInput from '@/components/TaskInput'
 import TaskList from '@/components/TaskList'
-import NotesScratchpad from '@/components/NotesScratchpad'
 import PurgeModal from '@/components/PurgeModal'
 import RetroModal from '@/components/RetroModal'
 import SettingsModal from '@/components/SettingsModal'
@@ -453,10 +452,6 @@ function Dashboard() {
     }
   }
 
-  function handleNoteChange(note: string) {
-    updateLog(prev => ({ ...prev, note }))
-  }
-
   async function handlePurgeAction(taskId: string, action: 'keep' | 'done' | 'discard') {
     if (action === 'keep') {
       await updateTaskAcrossLogs(taskId, t => ({ ...t, createdAt: new Date().toISOString() }))
@@ -505,8 +500,7 @@ function Dashboard() {
       {activeTab === 'daily' && (
         <div className="max-w-6xl mx-auto px-8 py-10">
 
-          {/* Two-column layout */}
-          <div className="grid grid-cols-[1fr_272px] gap-10">
+          <div className="max-w-2xl">
             <div className="min-w-0">
 
               {/* Date navigation — lives inside left column so right edge aligns with task input */}
@@ -614,9 +608,6 @@ function Dashboard() {
                   )}
                 </>
               )}
-            </div>
-            <div className="sticky top-24 self-start pt-1">
-              <NotesScratchpad value={log.note} onChange={handleNoteChange} />
             </div>
           </div>
         </div>

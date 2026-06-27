@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, ArrowRight, Calendar, Trash2, X } from 'lucide-react'
+import { CheckCircle2, ChevronsRight, Calendar, Trash2, X } from 'lucide-react'
 import CalendarPopover from './CalendarPopover'
 
 interface BulkActionFooterProps {
@@ -13,6 +13,17 @@ interface BulkActionFooterProps {
   onDelete: () => void
   onClear: () => void
 }
+
+const BAR_BASE = `fixed bottom-8 left-1/2 -translate-x-1/2 z-50
+  flex items-center gap-0 px-4 py-2.5 rounded-2xl
+  border border-[#393939]
+  shadow-[0_10px_15px_-3px_rgba(0,0,0,0.5)]`
+
+const BAR_BG = { background: 'rgba(27,27,27,0.90)', backdropFilter: 'blur(14px)' }
+
+// Matches platform-wide text-sm font-medium baseline
+const BTN = `flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+  text-sm font-medium transition-colors duration-150 whitespace-nowrap`
 
 export default function BulkActionFooter({
   selectedCount,
@@ -28,20 +39,20 @@ export default function BulkActionFooter({
 
   if (deleteConfirm) {
     return (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-        <div className="flex items-center gap-3 bg-zinc-950 border border-zinc-700 rounded-2xl px-6 py-3.5 shadow-2xl">
-          <span className="text-sm text-zinc-300">
-            Delete {selectedCount} task{selectedCount !== 1 ? 's' : ''}?
-          </span>
+      <div className={BAR_BASE} style={BAR_BG}>
+        <span className="text-sm font-medium text-white/60 pr-4 mr-1 border-r border-[#393939] whitespace-nowrap">
+          Delete {selectedCount} task{selectedCount !== 1 ? 's' : ''}?
+        </span>
+        <div className="flex items-center gap-1 pl-3">
           <button
             onClick={() => { onDelete(); setDeleteConfirm(false) }}
-            className="text-sm px-4 py-2 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/25 transition-colors duration-150"
+            className={`${BTN} text-red-400 hover:text-red-300 hover:bg-red-500/10`}
           >
             Delete
           </button>
           <button
             onClick={() => setDeleteConfirm(false)}
-            className="text-sm px-4 py-2 rounded-lg bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors duration-150"
+            className={`${BTN} text-white/50 hover:text-white/80 hover:bg-white/5`}
           >
             Cancel
           </button>
@@ -51,37 +62,38 @@ export default function BulkActionFooter({
   }
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="flex items-center gap-0.5 bg-zinc-950 border border-zinc-800 rounded-2xl px-2.5 py-2.5 shadow-2xl">
-        <span className="text-sm text-zinc-500 px-3 select-none whitespace-nowrap">
-          {selectedCount} selected
-        </span>
-        <div className="w-px h-5 bg-zinc-800 mx-1" />
+    <div className={BAR_BASE} style={BAR_BG}>
+      {/* Selection count */}
+      <div className="flex items-center gap-1.5 pr-4 mr-2 border-r border-[#393939] select-none whitespace-nowrap">
+        <span className="text-sm font-bold text-white">{selectedCount}</span>
+        <span className="text-[10px] font-semibold tracking-widest text-white/40 uppercase">Selected</span>
+      </div>
 
+      {/* Actions */}
+      <div className="flex items-center gap-0.5">
         <button
           onClick={onComplete}
-          className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl text-zinc-300 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-150 whitespace-nowrap"
+          className={`${BTN} text-white/70 hover:text-emerald-400 hover:bg-emerald-500/8`}
         >
-          <CheckCircle2 size={16} />
+          <CheckCircle2 size={15} />
           Complete
         </button>
 
         <button
           onClick={onMoveToTomorrow}
-          className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl text-zinc-300 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all duration-150 whitespace-nowrap"
+          className={`${BTN} text-white/70 hover:text-indigo-400 hover:bg-indigo-500/8`}
         >
-          <ArrowRight size={16} />
+          <ChevronsRight size={15} />
           Next Day
         </button>
 
         <div className="relative">
           <button
             onClick={() => setCalOpen(o => !o)}
-            className={`flex items-center gap-2 text-sm px-4 py-2 rounded-xl transition-all duration-150 whitespace-nowrap
-              ${calOpen ? 'text-indigo-400 bg-indigo-500/15' : 'text-zinc-300 hover:text-indigo-400 hover:bg-indigo-500/10'}`}
+            className={`${BTN} ${calOpen ? 'text-indigo-400 bg-indigo-500/10' : 'text-white/70 hover:text-indigo-400 hover:bg-indigo-500/8'}`}
           >
-            <Calendar size={16} />
-            Move to date
+            <Calendar size={15} />
+            Move to Date
           </button>
           {calOpen && (
             <CalendarPopover
@@ -96,22 +108,22 @@ export default function BulkActionFooter({
 
         <button
           onClick={() => setDeleteConfirm(true)}
-          className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl text-zinc-300 hover:text-red-400 hover:bg-red-500/10 transition-all duration-150 whitespace-nowrap"
+          className={`${BTN} text-red-400/80 hover:text-red-300 hover:bg-red-500/8`}
         >
-          <Trash2 size={16} />
+          <Trash2 size={15} />
           Delete
         </button>
-
-        <div className="w-px h-5 bg-zinc-800 mx-1" />
-
-        <button
-          onClick={onClear}
-          className="p-2 rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all duration-150"
-          title="Clear selection (Esc)"
-        >
-          <X size={17} />
-        </button>
       </div>
+
+      {/* Dismiss */}
+      <div className="w-px h-4 bg-[#393939] mx-2" />
+      <button
+        onClick={onClear}
+        title="Clear selection (Esc)"
+        className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors duration-150"
+      >
+        <X size={15} />
+      </button>
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Tag, Star, X, Trash2, SendHorizonal } from 'lucide-react'
 import TagPicker from './TagPicker'
-import { getTagClass } from '@/lib/tags'
+import { getTagStyle } from '@/lib/tags'
 
 interface TaskInputProps {
   onAdd: (text: string, tags: string[], starred: boolean, subtasks?: string[]) => void
@@ -169,7 +169,7 @@ export default function TaskInput({ onAdd }: TaskInputProps) {
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Add a task — Tab to indent as subtask, ⌘↵ to save"
-            style={{ color: 'white', caretColor: '#818cf8', lineHeight: '21px', resize: 'none', overflow: 'hidden' }}
+            style={{ caretColor: '#818cf8', lineHeight: '21px', resize: 'none', overflow: 'hidden' }}
             className={`w-full bg-transparent outline-none text-sm font-mono placeholder-zinc-600
               ${isMultiline ? 'pl-6' : 'pl-0'}`}
           />
@@ -187,7 +187,8 @@ export default function TaskInput({ onAdd }: TaskInputProps) {
             {tags.map(tag => (
               <span
                 key={tag}
-                className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${getTagClass(tag)}`}
+                style={getTagStyle(tag)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
               >
                 {tag}
                 <button

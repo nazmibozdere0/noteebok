@@ -1,7 +1,24 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { RotateCcw, Settings, LogOut, User } from 'lucide-react'
+import { RotateCcw, Settings, LogOut, User, Sun, Moon } from 'lucide-react'
+
+function useTheme() {
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme') as 'dark' | 'light' | null
+    if (saved) apply(saved)
+  }, [])
+
+  function apply(t: 'dark' | 'light') {
+    setTheme(t)
+    localStorage.setItem('theme', t)
+    document.documentElement.classList.toggle('light', t === 'light')
+  }
+
+  return { theme, toggle: () => apply(theme === 'dark' ? 'light' : 'dark') }
+}
 
 export type Tab = 'daily' | 'feed' | 'starred'
 
@@ -36,6 +53,7 @@ export default function Header({
 }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null)
   const shimmerRef = useRef<HTMLDivElement>(null)
+  const { theme, toggle } = useTheme()
 
   function handleMouseMove(e: React.MouseEvent<HTMLElement>) {
     if (!headerRef.current || !shimmerRef.current) return
@@ -98,6 +116,13 @@ export default function Header({
           >
             <RotateCcw size={13} />
             Weekly Retro
+          </button>
+          <button
+            onClick={toggle}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="w-8 h-8 flex items-center justify-center rounded-full border border-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white transition-all duration-150"
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
           <AvatarMenu user={user} onSettings={onSettingsClick} onLogout={onLogout} />
         </div>

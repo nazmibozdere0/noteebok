@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Task } from '@/lib/types'
 import { getDayAge, cleanText } from '@/lib/hygiene'
-import { CheckCircle2, Circle, Flame, Trash2, Star, Tag, GitBranch, Plus } from 'lucide-react'
+import { CheckCircle2, Circle, Trash2, Star, Tag, GitBranch, Plus, MoreHorizontal } from 'lucide-react'
 import TagChips from './TagChips'
 import TagPicker from './TagPicker'
 import PersonChip from './PersonChip'
@@ -357,10 +357,12 @@ function TaskRow({
   onDragStart: (id: string) => void
   onDragEnter: (id: string) => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const tagContainerRef = useRef<HTMLDivElement>(null)
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fillTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -368,6 +370,22 @@ function TaskRow({
 
   const PRESS_DELAY = 150
   const PRESS_DURATION = 500
+
+  // Track tagPickerOpen in a ref so the menu close handler always sees the latest value
+  const tagPickerOpenRef = useRef(false)
+  tagPickerOpenRef.current = tagPickerOpen
+
+  // Close "..." menu on outside click — use 'click' (not mousedown) so trackpad
+  // scroll gestures don't accidentally close it. Also pause while TagPicker is open.
+  useEffect(() => {
+    if (!menuOpen) return
+    function handler(e: MouseEvent) {
+      if (tagPickerOpenRef.current) return
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [menuOpen])
 
   function startPress() {
     if (visuallyDone || editing) return
@@ -417,12 +435,10 @@ function TaskRow({
       const ta = inputRef.current
       if (!ta) return
       ta.focus()
-      // Move cursor to end
       ta.selectionStart = ta.selectionEnd = ta.value.length
     }
   }, [editing])
 
-  // Auto-resize textarea in edit mode
   useEffect(() => {
     const ta = inputRef.current
     if (!ta || !editing) return
@@ -440,7 +456,6 @@ function TaskRow({
     if (firstLine && firstLine !== displayText) {
       onUpdateText(task.id, firstLine)
     }
-    // Turn on branch if new subtasks are being added
     if (subtaskLines.length > 0 && !task.branch) {
       onToggleBranch(task.id)
     }
@@ -452,36 +467,22 @@ function TaskRow({
 
   function handleEditKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const ta = e.currentTarget
-
     if (e.key === 'Escape') { setEditing(false); return }
-
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      commitEdit()
-      return
-    }
-
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit(); return }
     if (e.key === 'Tab') {
       e.preventDefault()
       const { selectionStart, value: v } = ta
       const lineStart = v.lastIndexOf('\n', selectionStart - 1) + 1
       const lineText = v.slice(lineStart)
-
       if (!e.shiftKey) {
         if (!lineText.startsWith('\t')) {
-          const next = v.slice(0, lineStart) + '\t' + v.slice(lineStart)
-          setEditValue(next)
-          requestAnimationFrame(() => {
-            ta.selectionStart = ta.selectionEnd = selectionStart + 1
-          })
+          setEditValue(v.slice(0, lineStart) + '\t' + v.slice(lineStart))
+          requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = selectionStart + 1 })
         }
       } else {
         if (lineText.startsWith('\t')) {
-          const next = v.slice(0, lineStart) + v.slice(lineStart + 1)
-          setEditValue(next)
-          requestAnimationFrame(() => {
-            ta.selectionStart = ta.selectionEnd = Math.max(lineStart, selectionStart - 1)
-          })
+          setEditValue(v.slice(0, lineStart) + v.slice(lineStart + 1))
+          requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = Math.max(lineStart, selectionStart - 1) })
         }
       }
     }
@@ -492,12 +493,12 @@ function TaskRow({
       onDoubleClick={!visuallyDone && !editing ? startEdit : undefined}
       onMouseDown={() => { startPress(); if (!editing) onDragStart(task.id) }}
       onMouseUp={cancelPress}
-      onMouseLeave={cancelPress}
+      onMouseLeave={() => { cancelPress(); setMenuOpen(false); setTagPickerOpen(false) }}
       onMouseEnter={() => onDragEnter(task.id)}
       onTouchStart={startPress}
       onTouchEnd={cancelPress}
       className={[
-        'group relative flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors duration-150',
+        'group relative flex items-center gap-3 px-2 py-1.5 rounded-lg transition-colors duration-150',
         newlyCompleted ? 'task-slide-in' : '',
         newlyUncompleted ? 'task-slide-in-from-below' : '',
         completing ? 'task-exiting' : '',
@@ -508,17 +509,16 @@ function TaskRow({
           : '',
       ].filter(Boolean).join(' ')}
     >
+      {/* Press-to-complete fill animation */}
       <div className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none">
         <div
           ref={fillRef}
           className="absolute inset-y-0 left-0"
-          style={{
-            width: '0%',
-            opacity: 0,
-            background: 'linear-gradient(90deg, rgba(34,197,94,0.35), rgba(34,197,94,0.12))',
-          }}
+          style={{ width: '0%', opacity: 0, background: 'linear-gradient(90deg, rgba(34,197,94,0.35), rgba(34,197,94,0.12))' }}
         />
       </div>
+
+      {/* Checkbox */}
       <button
         onClick={onToggle}
         onDoubleClick={e => e.stopPropagation()}
@@ -529,98 +529,129 @@ function TaskRow({
         {visuallyDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
       </button>
 
-      <div className="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
+      {/* Text + mentions — stays within its column, never bleeds into tags */}
+      <div className="flex-1 min-w-0">
         {editing ? (
-          <div className="flex-1 min-w-0">
-            <textarea
-              ref={inputRef}
-              value={editValue}
-              onChange={e => setEditValue(e.target.value)}
-              onBlur={commitEdit}
-              onKeyDown={handleEditKeyDown}
-              rows={1}
-              style={{ resize: 'none', overflow: 'hidden', lineHeight: '21px', caretColor: '#818cf8' }}
-              className="w-full bg-transparent text-sm text-zinc-200 outline-none border-b border-zinc-600 focus:border-indigo-500 transition-colors duration-150 py-0.5"
-            /></div>
+          <textarea
+            ref={inputRef}
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={handleEditKeyDown}
+            rows={1}
+            style={{ resize: 'none', overflow: 'hidden', lineHeight: '21px', caretColor: '#818cf8' }}
+            className="w-full bg-transparent text-sm text-zinc-200 outline-none border-b border-zinc-600 focus:border-indigo-500 transition-colors duration-150 py-0.5"
+          />
         ) : (
-          <>
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className={`text-sm leading-snug transition-all duration-200 select-none
               ${visuallyDone ? 'line-through text-zinc-400' : 'text-zinc-200'}`}
             >
               {displayText}
             </span>
             {mentions.map(m => <PersonChip key={m} name={m} />)}
-            <TagChips tags={tags} limit={2} />
-          </>
+          </div>
         )}
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0" onDoubleClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
-        {isStale && !editing && (
-          <span title={`${age}d old`} className="text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Flame size={13} />
-          </span>
-        )}
-        {!visuallyDone && !editing && (
-          <span className="text-[10px] text-zinc-600 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
-            {age}d
-          </span>
-        )}
+      {/* Right section — fixed layout so tags column is always at the same X position */}
+      <div
+        className="flex items-center gap-2 flex-shrink-0"
+        onDoubleClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
+      >
+        {/* Overdue — hover only, fixed width slot so tags don't shift */}
         {!editing && (
-          <div className="relative" ref={tagContainerRef}>
-            <button
-              type="button"
-              onClick={() => setTagPickerOpen(o => !o)}
-              className={`p-1 rounded-md transition-all duration-150
-                ${tagPickerOpen
-                  ? 'text-indigo-400 bg-indigo-500/15'
-                  : 'text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-indigo-400 hover:bg-indigo-500/10'}`}
-              title="Edit tags"
-            >
-              <Tag size={13} />
-            </button>
-            {tagPickerOpen && (
-              <TagPicker
-                selected={tags}
-                onChange={newTags => onUpdateTags(task.id, newTags)}
-                onClose={() => setTagPickerOpen(false)}
-                containerRef={tagContainerRef}
-                placement="down"
-              />
+          <div className="w-12 flex justify-end">
+            {isStale && (
+              <span className="flex items-center gap-0.5 text-[11px] font-medium text-amber-500 tabular-nums select-none opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                🔥 {age}d
+              </span>
             )}
           </div>
         )}
+
+        {/* Tags column — fixed min-width so all rows align */}
         {!editing && (
-          <button
-            onClick={() => onToggleBranch(task.id)}
-            onMouseDown={e => e.stopPropagation()}
-            className={`p-1 rounded-md transition-all duration-150 opacity-0 group-hover:opacity-100
-              ${task.branch
-                ? 'text-indigo-400 bg-indigo-500/15 hover:bg-indigo-500/25'
-                : 'text-zinc-500 hover:text-indigo-400 hover:bg-indigo-500/10'}`}
-            title="Branch (subtasks)"
-          >
-            <GitBranch size={13} />
-          </button>
+          <div className="min-w-[80px] flex justify-end">
+            {tags.length > 0 && <TagChips tags={tags} limit={2} />}
+          </div>
         )}
+
+        {/* Hover-only actions */}
         {!editing && (
-          <button
-            onClick={() => onToggleStar(task.id)}
-            className={`p-1 rounded-md transition-all duration-150
-              ${task.starred
-                ? 'text-amber-400 hover:text-amber-300'
-                : 'text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-amber-400 hover:bg-amber-500/10'}`}
-          >
-            <Star size={13} fill={task.starred ? 'currentColor' : 'none'} />
-          </button>
-        )}
-        {!editing && (
-          <button
-            onClick={() => onDelete(task.id)}
-            className="p-1 rounded-md text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
-          >
-            <Trash2 size={13} />
-          </button>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            {/* Star */}
+            <button
+              onClick={() => onToggleStar(task.id)}
+              className={`p-1 rounded-md transition-colors duration-150
+                ${task.starred
+                  ? 'text-amber-400 hover:text-amber-300'
+                  : 'text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10'}`}
+            >
+              <Star size={13} fill={task.starred ? 'currentColor' : 'none'} />
+            </button>
+
+            {/* Delete */}
+            <button
+              onClick={() => onDelete(task.id)}
+              className="p-1 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors duration-150"
+            >
+              <Trash2 size={13} />
+            </button>
+
+            {/* "..." menu */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => { setMenuOpen(o => !o); setTagPickerOpen(false) }}
+                className={`p-1 rounded-md transition-colors duration-150
+                  ${menuOpen ? 'text-zinc-300 bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+              >
+                <MoreHorizontal size={13} />
+              </button>
+
+              {menuOpen && (
+                <div
+                  style={{ background: '#09090b' }}
+                  className="absolute right-0 top-full mt-1.5 z-50 w-48
+                             border border-zinc-800 rounded-xl shadow-2xl py-1"
+                >
+                  {/* Branch toggle */}
+                  <button
+                    onClick={() => { onToggleBranch(task.id); setMenuOpen(false) }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors duration-100
+                      ${task.branch
+                        ? 'text-indigo-400 hover:bg-zinc-900'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+                  >
+                    <GitBranch size={13} />
+                    {task.branch ? 'Remove subtasks' : 'Add subtasks'}
+                  </button>
+
+                  {/* Tag editor */}
+                  <div ref={tagContainerRef} className="relative">
+                    <button
+                      onClick={() => setTagPickerOpen(o => !o)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors duration-100
+                        ${tagPickerOpen ? 'text-indigo-400 bg-zinc-900' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+                    >
+                      <Tag size={13} />
+                      Edit tags
+                    </button>
+                    {tagPickerOpen && (
+                      <TagPicker
+                        selected={tags}
+                        onChange={newTags => onUpdateTags(task.id, newTags)}
+                        onClose={() => setTagPickerOpen(false)}
+                        containerRef={menuRef}
+                        placement="down"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
