@@ -255,10 +255,12 @@ export default function TaskInput({ onAdd }: TaskInputProps) {
             <button
               type="submit"
               disabled={!value.trim()}
-              className="flex items-center justify-center w-7 h-7 rounded-lg
-                         bg-emerald-600 hover:bg-emerald-500 text-white
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-white
                          disabled:opacity-35 disabled:cursor-not-allowed
                          transition-all duration-150"
+              style={{ backgroundColor: '#46d07f' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#5bdc8f' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#46d07f' }}
             >
               <SendHorizonal size={14} />
             </button>

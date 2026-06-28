@@ -38,9 +38,9 @@ interface HeaderProps {
 }
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'daily',   label: 'Daily Management' },
+  { id: 'daily',   label: 'Daily' },
   { id: 'feed',    label: 'Feed' },
-  { id: 'starred', label: 'Starred Tasks' },
+  { id: 'starred', label: 'Starred' },
 ]
 
 export default function Header({
@@ -90,20 +90,37 @@ export default function Header({
           noteebok
         </span>
 
-        {/* Floating island nav */}
-        <nav className="flex items-center bg-zinc-900 border border-zinc-800 rounded-2xl p-1 gap-0.5">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`relative px-4 py-1.5 rounded-xl text-sm transition-all duration-200
-                ${activeTab === tab.id
-                  ? 'bg-zinc-700 text-white shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Underline tab nav */}
+        <nav className="flex items-center" style={{ gap: '32px' }}>
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id
+            const activeColor   = theme === 'light' ? '#1c1c1e' : '#f2f2f4'
+            const inactiveColor = theme === 'light' ? '#6c6c70' : '#8a8a8e'
+            const hoverColor    = theme === 'light' ? '#3c3c43' : '#c9c9cd'
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                style={{
+                  fontSize: '17px',
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? activeColor : inactiveColor,
+                  borderBottom: isActive ? '2px solid #46d07f' : '2px solid transparent',
+                  paddingBottom: '7px',
+                  paddingTop: '2px',
+                  background: 'none',
+                  transition: 'color 120ms ease, border-color 150ms ease',
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = hoverColor }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = inactiveColor }}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
         </nav>
 
         {/* Right actions */}
