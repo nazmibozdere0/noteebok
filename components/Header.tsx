@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { RotateCcw, Settings, LogOut, User, Sun, Moon } from 'lucide-react'
+import { RotateCcw, Settings, LogOut, User, Sun, Moon, Recycle } from 'lucide-react'
 
 function useTheme() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
@@ -33,6 +33,7 @@ interface HeaderProps {
   onTabChange: (tab: Tab) => void
   onRetroClick: () => void
   onSettingsClick: () => void
+  onHygieneClick: () => void
   user: AppUser | null
   onLogout: () => void
 }
@@ -48,6 +49,7 @@ export default function Header({
   onTabChange,
   onRetroClick,
   onSettingsClick,
+  onHygieneClick,
   user,
   onLogout,
 }: HeaderProps) {
@@ -141,7 +143,7 @@ export default function Header({
           >
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
-          <AvatarMenu user={user} onSettings={onSettingsClick} onLogout={onLogout} />
+          <AvatarMenu user={user} onSettings={onSettingsClick} onHygiene={onHygieneClick} onLogout={onLogout} />
         </div>
 
       </div>
@@ -169,10 +171,12 @@ export default function Header({
 function AvatarMenu({
   user,
   onSettings,
+  onHygiene,
   onLogout,
 }: {
   user: AppUser | null
   onSettings: () => void
+  onHygiene: () => void
   onLogout: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -229,6 +233,16 @@ function AvatarMenu({
           >
             <Settings size={13} />
             Settings
+          </button>
+
+          {/* Hygiene Cycle */}
+          <button
+            onClick={() => { onHygiene(); setOpen(false) }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-400
+                       hover:text-white hover:bg-zinc-900 transition-colors duration-100"
+          >
+            <Recycle size={13} />
+            Hygiene Cycle
           </button>
 
           {/* Log out */}

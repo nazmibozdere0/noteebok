@@ -30,7 +30,6 @@ import { generateRetro } from '@/lib/ai'
 function todayISO(): string { return localDateISO() }
 
 const LOG_CACHE_KEY = 'nb_log_cache'
-const LAST_DATE_KEY = 'nb_last_date'
 const USER_KEY = 'nb_user'
 const CACHE_WINDOW = 15 // days before/after today to keep
 
@@ -56,14 +55,6 @@ function persistLogCache(cache: Map<string, DailyLog>, updatedDate: string, log:
   } catch { /* storage full — ignore */ }
 }
 
-function readLastDate(): string {
-  if (typeof window === 'undefined') return localDateISO()
-  return localStorage.getItem(LAST_DATE_KEY) ?? localDateISO()
-}
-
-function saveLastDate(date: string) {
-  try { localStorage.setItem(LAST_DATE_KEY, date) } catch { /* ignore */ }
-}
 
 function formatHeaderDate(iso: string): { day: string; date: string } {
   const d = new Date(iso + 'T00:00:00')
@@ -118,14 +109,14 @@ export default function Root() {
 
 function Dashboard() {
   const [today] = useState(todayISO)
-  const [viewedDate, setViewedDate] = useState(() => readLastDate())
+  const [viewedDate, setViewedDate] = useState(todayISO)
   const [activeTab, setActiveTab] = useState<Tab>('daily')
   const cache = useRef<Map<string, DailyLog>>(readLogCache())
   const [log, setLog] = useState<DailyLog>(() => {
-    const initial = readLastDate()
+    const initial = localDateISO()
     return cache.current.get(initial) ?? { date: initial, tasks: [], note: '' }
   })
-  const [logLoading, setLogLoading] = useState(() => !cache.current.has(readLastDate()))
+  const [logLoading, setLogLoading] = useState(() => !cache.current.has(localDateISO()))
   const [staleTasks, setStaleTasks] = useState<Task[]>([])
   const [showPurge, setShowPurge] = useState(false)
   const [showRetro, setShowRetro] = useState(false)
@@ -151,7 +142,6 @@ function Dashboard() {
   const pendingSaves = useRef<Set<Promise<void>>>(new Set())
 
   function navigateTo(date: string) {
-    saveLastDate(date)
     // Apply cached state immediately — batched with setViewedDate into one render,
     // eliminating the flash of stale content between navigation clicks.
     const cached = cache.current.get(date)
@@ -189,17 +179,23 @@ function Dashboard() {
         getLogByDate(d).then(l => persistLogCache(cache.current, d, l))
       }
     }
-    getStaleTasks(3).then(stale => {
-      setStaleTasks(stale)
-      if (stale.length > 0) setTimeout(() => setShowPurge(true), 800)
-    })
+    const HYGIENE_KEY = 'hygiene_shown_date'
+    const alreadyShownToday = localStorage.getItem(HYGIENE_KEY) === today
+    if (!alreadyShownToday) {
+      getStaleTasks(3).then(stale => {
+        setStaleTasks(stale)
+        if (stale.length > 0) {
+          localStorage.setItem(HYGIENE_KEY, today)
+          setTimeout(() => setShowPurge(true), 800)
+        }
+      })
+    }
   }, [today])
 
   async function handleLogout() {
     await Promise.allSettled(Array.from(pendingSaves.current))
     const supabase = createClient()
     localStorage.removeItem(LOG_CACHE_KEY)
-    localStorage.removeItem(LAST_DATE_KEY)
     localStorage.removeItem(USER_KEY)
     await supabase.auth.signOut()
   }
@@ -492,6 +488,12 @@ function Dashboard() {
         onTabChange={setActiveTab}
         onRetroClick={() => setShowRetro(true)}
         onSettingsClick={() => setShowSettings(true)}
+        onHygieneClick={() => {
+          getStaleTasks(3).then(stale => {
+            setStaleTasks(stale)
+            setShowPurge(true)
+          })
+        }}
         user={appUser}
         onLogout={handleLogout}
       />

@@ -1,12 +1,92 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Task } from '@/lib/types'
 import { getDayAge, cleanText } from '@/lib/hygiene'
 import { CheckCircle2, Circle, Trash2, Star, Tag, GitBranch, Plus, MoreHorizontal } from 'lucide-react'
 import TagChips from './TagChips'
 import TagPicker from './TagPicker'
 import PersonChip from './PersonChip'
+
+// [text](url)  |  https://...  |  www....  |  __underline__
+const RICH_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|https?:\/\/[^\s<>"']+[^\s<>"'.!?,]|www\.[^\s<>"']+[^\s<>"'.!?,]|__[^_\n]+__/g
+
+const LINK_STYLE: React.CSSProperties = { color: '#818cf8', textDecoration: 'underline' }
+
+function RichLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={LINK_STYLE}
+      className="hover:opacity-80 transition-opacity"
+      onClick={e => e.stopPropagation()}
+    >
+      {children}
+    </a>
+  )
+}
+
+function renderRichText(text: string): React.ReactNode {
+  const re = new RegExp(RICH_RE.source, 'g')
+  const nodes: React.ReactNode[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) nodes.push(text.slice(last, match.index))
+    const full = match[0]
+    const mdLabel = match[1]
+    const mdUrl   = match[2]
+    if (mdUrl) {
+      nodes.push(<RichLink key={match.index} href={mdUrl}>{mdLabel}</RichLink>)
+    } else if (full.startsWith('http')) {
+      nodes.push(<RichLink key={match.index} href={full}>{full}</RichLink>)
+    } else if (full.startsWith('www.')) {
+      nodes.push(<RichLink key={match.index} href={`https://${full}`}>{full}</RichLink>)
+    } else if (full.startsWith('__')) {
+      nodes.push(<u key={match.index}>{full.slice(2, -2)}</u>)
+    }
+    last = match.index + full.length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes.length === 0 ? text : nodes.length === 1 ? nodes[0] : nodes
+}
+
+function insertUnderline(ta: HTMLTextAreaElement, setValue: (v: string) => void) {
+  const { selectionStart: s, selectionEnd: end, value: v } = ta
+  const selected = v.slice(s, end)
+  setValue(v.slice(0, s) + `__${selected}__` + v.slice(end))
+  const newPos = selected ? end + 4 : s + 2
+  requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = newPos })
+}
+
+function handleRichPaste(
+  e: React.ClipboardEvent<HTMLTextAreaElement>,
+  value: string,
+  setValue: (v: string) => void,
+) {
+  const html = e.clipboardData.getData('text/html')
+  if (!html) return
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const anchors = Array.from(doc.querySelectorAll('a[href]'))
+  if (anchors.length === 0) return
+  e.preventDefault()
+  for (const a of anchors) {
+    const href = a.getAttribute('href') ?? ''
+    const label = a.textContent?.trim() ?? ''
+    if (href.startsWith('http') && label) {
+      a.replaceWith(document.createTextNode(`[${label}](${href})`))
+    }
+  }
+  const pasted = (doc.body.textContent ?? '').trim()
+  if (!pasted) return
+  const ta = e.currentTarget
+  const { selectionStart: s, selectionEnd: end } = ta
+  const next = value.slice(0, s) + pasted + value.slice(end)
+  setValue(next)
+  requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = s + pasted.length })
+}
 
 interface TaskListProps {
   tasks: Task[]
@@ -32,14 +112,20 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
   const dragDidMove = useRef(false)
   const dragPath = useRef<string[]>([])
   const preExistingIds = useRef<Set<string>>(new Set())
+  const mouseDownTime = useRef<number>(0)
   const selectedRef = useRef(selectedIds)
   selectedRef.current = selectedIds
   const onSelectionChangeRef = useRef(onSelectionChange)
   onSelectionChangeRef.current = onSelectionChange
 
+  // Press-to-complete starts animating after 150ms — if the user held that long
+  // they were attempting a complete, not a tap-to-select.
+  const PRESS_DELAY = 150
+
   useEffect(() => {
     function handleMouseUp() {
-      if (isDragging.current && !dragDidMove.current && dragStartId.current) {
+      const heldMs = Date.now() - mouseDownTime.current
+      if (isDragging.current && !dragDidMove.current && dragStartId.current && heldMs < PRESS_DELAY) {
         const next = new Set(selectedRef.current)
         const id = dragStartId.current
         if (next.has(id)) next.delete(id)
@@ -61,6 +147,7 @@ export default function TaskList({ tasks, onToggle, onDelete, onToggleStar, onUp
     dragStartId.current = id
     dragDidMove.current = false
     dragPath.current = []
+    mouseDownTime.current = Date.now()
     preExistingIds.current = new Set(selectedRef.current)
     document.body.style.userSelect = 'none'
   }
@@ -267,7 +354,7 @@ function SubtaskRow({ task, onToggle, onDelete }: {
       <span className={`flex-1 text-xs leading-snug select-none
         ${task.done ? 'line-through text-zinc-600' : 'text-zinc-400'}`}
       >
-        {task.text}
+        {renderRichText(task.text)}
       </span>
       <button
         onClick={() => onDelete(task.id)}
@@ -467,6 +554,7 @@ function TaskRow({
 
   function handleEditKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const ta = e.currentTarget
+    if ((e.metaKey || e.ctrlKey) && e.key === 'u') { e.preventDefault(); insertUnderline(ta, setEditValue); return }
     if (e.key === 'Escape') { setEditing(false); return }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit(); return }
     if (e.key === 'Tab') {
@@ -536,6 +624,7 @@ function TaskRow({
             ref={inputRef}
             value={editValue}
             onChange={e => setEditValue(e.target.value)}
+            onPaste={e => handleRichPaste(e, editValue, setEditValue)}
             onBlur={commitEdit}
             onKeyDown={handleEditKeyDown}
             rows={1}
@@ -547,7 +636,7 @@ function TaskRow({
             <span className={`text-sm leading-snug transition-all duration-200 select-none
               ${visuallyDone ? 'line-through text-zinc-400' : 'text-zinc-200'}`}
             >
-              {displayText}
+              {renderRichText(displayText)}
             </span>
             {mentions.map(m => <PersonChip key={m} name={m} />)}
           </div>
